@@ -16,6 +16,17 @@ Bidirectional implement/review exchange via GitHub PR comments. An implementer w
 npx skills add ragingwind/agent-skills --skill reviewloop
 ```
 
+### Development (local testing)
+
+Load the plugin directly from a local clone without installing:
+
+```bash
+git clone https://github.com/ragingwind/agent-skills.git
+claude --plugin-dir ./agent-skills
+```
+
+After making changes, run `/reload-plugins` inside the session to pick them up without restarting.
+
 ## Prerequisites
 
 - `gh` CLI authenticated and working
