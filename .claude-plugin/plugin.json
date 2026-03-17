@@ -1,0 +1,10 @@
+{
+  "name": "ragingwind-agent-skills",
+  "description": "Multi-agent orchestration skills for AI coding agents — autonomous pipelines, parallel execution, and self-healing loops.",
+  "version": "1.0.0",
+  "author": { "name": "ragingwind" },
+  "homepage": "https://github.com/ragingwind/agent-skills",
+  "repository": "https://github.com/ragingwind/agent-skills",
+  "license": "MIT",
+  "commands": "./.claude/commands"
+}

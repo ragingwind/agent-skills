@@ -1,0 +1,17 @@
+{
+  "name": "ragingwind-agent-skills",
+  "owner": { "name": "ragingwind" },
+  "metadata": {
+    "description": "Multi-agent orchestration skills for AI coding agents — autonomous pipelines, parallel execution, and self-healing loops."
+  },
+  "plugins": [
+    {
+      "name": "ragingwind-agent-skills",
+      "source": {
+        "source": "github",
+        "repo": "ragingwind/agent-skills"
+      },
+      "description": "Multi-agent orchestration skills — autopilot, routing, swarm, critics, ralph, and more."
+    }
+  ]
+}
