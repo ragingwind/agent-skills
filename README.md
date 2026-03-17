@@ -21,18 +21,6 @@ npx skills add ragingwind/agent-skills
 
 See [docs/getting-started.md](docs/getting-started.md) for Cursor, Windsurf, Copilot, and more.
 
-## Directory Structure
-
-```
-skills/           — Reusable skill definitions (each with SKILL.md)
-agents/           — Agent persona definitions
-.claude/commands/ — Slash commands for Claude Code
-references/       — Shared checklists and reference materials
-hooks/            — Session lifecycle hooks
-docs/             — Documentation and guides
-.claude-plugin/   — Claude Code marketplace plugin manifests
-```
-
 ## Skills
 
 | Skill | Description |
