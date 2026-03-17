@@ -51,7 +51,37 @@ By default `skills add` symlinks into the agent directory, so edits to the clone
 
 ## Configuration
 
-Edit `config.yaml` to register reviewer agents and customize prompt templates.
+Edit [`config.yaml`](config.yaml) to customize the review loop behavior.
+
+### Agent Registry
+
+Register reviewer agents under the `agents` key. Each agent defines a CLI command, prompt delivery mode, and availability check:
+
+```yaml
+agents:
+  claude:
+    enabled: true
+    command: "claude -p --output-format=text --permission-mode=plan"
+    prompt_mode: stdin      # stdin | arg | file
+    timeout: 600
+    check: "which claude"
+    description: "Claude Code"
+```
+
+### Defaults
+
+```yaml
+defaults:
+  mode: inline              # inline | daemon | hook
+  reviewer: all             # "all" or comma-separated: "claude,opencode"
+  max_rounds: 5
+  review_strategy: parallel # parallel | sequential
+  same_issue_threshold: 2   # same findings N times → force stop
+```
+
+### Prompt Templates
+
+Customize review prompts via the `prompts` key: `preamble`, `diff_review`, `holistic_review`, `verdict_instructions`. Templates support variables like `{pr_number}`, `{round}`, `{pr_diff}`, `{custom_context}`.
 
 ## Documentation
 
