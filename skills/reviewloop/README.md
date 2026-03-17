@@ -16,16 +16,16 @@ Bidirectional implement/review exchange via GitHub PR comments. An implementer w
 npx skills add ragingwind/agent-skills --skill reviewloop
 ```
 
-### Development (local testing)
+### Development (local symlink)
 
-Load the plugin directly from a local clone without installing:
+Install from a local clone via symlink for live editing:
 
 ```bash
 git clone https://github.com/ragingwind/agent-skills.git
-claude --plugin-dir ./agent-skills
+npx skills add ./agent-skills --skill reviewloop
 ```
 
-After making changes, run `/reload-plugins` inside the session to pick them up without restarting.
+By default `skills add` symlinks into the agent directory, so edits to the clone are reflected immediately. Use `--copy` to copy files instead.
 
 ## Prerequisites
 

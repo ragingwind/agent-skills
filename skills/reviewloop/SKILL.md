@@ -1,3 +1,8 @@
+---
+name: reviewloop
+description: Bidirectional implement/review loop via GitHub PR comments. Use when you need automated code review with external agents on a pull request.
+---
+
 # Review Loop Skill
 
 Bidirectional implement/review exchange via GitHub PR comments. An implementer (current Claude Code session) works on code while an external reviewer agent provides feedback through PR comments.
