@@ -22,7 +22,8 @@ Install from a local clone via symlink for live editing:
 
 ```bash
 git clone https://github.com/ragingwind/agent-skills.git
-npx skills add ./agent-skills --skill reviewloop
+cd agent-skills
+npx skills add ./ --skill reviewloop
 ```
 
 By default `skills add` symlinks into the agent directory, so edits to the clone are reflected immediately. Use `--copy` to copy files instead.
