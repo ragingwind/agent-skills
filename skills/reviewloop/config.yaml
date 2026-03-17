@@ -1,0 +1,207 @@
+# ═══════════════════════════════════════════════════════════════
+# Review Loop Configuration
+# ═══════════════════════════════════════════════════════════════
+
+# ─── Agent Registry ───────────────────────────────────────────
+# Each agent defines how to invoke an external coding agent CLI.
+#
+# Fields:
+#   command:       Shell command (executed via subprocess)
+#   prompt_mode:   How to pass the review prompt to the agent
+#                  - stdin:  pipe prompt text via stdin (most universal)
+#                  - arg:    append prompt as CLI argument (short prompts only)
+#                  - file:   pass {prompt_file} path in command template
+#   timeout:       Max seconds to wait for agent response
+#   check:         Shell command to verify agent is installed (exit 0 = OK)
+#   description:   Human-readable label (shown in PR comments)
+#   model:         (optional) Override model for this agent
+#   flags:         (optional) Additional CLI flags as list
+
+agents:
+
+  claude:
+    enabled: true
+    command: >-
+      claude -p
+      --no-session-persistence
+      --output-format=text
+      --permission-mode=plan
+    prompt_mode: stdin
+    timeout: 600
+    check: "which claude"
+    description: "Claude Code"
+
+  # ─── Proxy Agent Template ───
+  # Use this template to route through a custom API proxy.
+  # Replace BASE_URL and MODEL with your proxy endpoint and model name.
+  #
+  # my-proxy-agent:
+  #   enabled: false
+  #   command: >-
+  #     ANTHROPIC_API_KEY="" ANTHROPIC_BASE_URL="http://your-proxy:9090/anthropic"
+  #     claude -p
+  #     --no-session-persistence
+  #     --output-format=text
+  #     --permission-mode=plan
+  #     --model=your-model-name
+  #   prompt_mode: stdin
+  #   timeout: 600
+  #   check: "which claude"
+  #   description: "Claude Code (your-model via proxy)"
+
+  # opencode:
+  #   enabled: false
+  #   command: >-
+  #     opencode run
+  #     --format=default
+  #   prompt_mode: stdin
+  #   timeout: 300
+  #   check: "which opencode"
+  #   description: "OpenCode"
+
+  # gemini:
+  #   enabled: false
+  #   command: >-
+  #     gemini
+  #     --output-format=text
+  #     --approval-mode=default
+  #   prompt_mode: stdin
+  #   timeout: 300
+  #   check: "which gemini"
+  #   description: "Gemini CLI (Google)"
+
+  # codex:
+  #   enabled: false
+  #   command: >-
+  #     codex
+  #     --approval-mode full-auto
+  #     -q
+  #   prompt_mode: arg
+  #   timeout: 300
+  #   check: "which codex"
+  #   description: "Codex (OpenAI)"
+
+  # ─── Custom Agent Template ───
+  # my-agent:
+  #   enabled: false
+  #   command: "/path/to/my-agent --review"
+  #   prompt_mode: stdin | arg | file
+  #   timeout: 300
+  #   check: "test -x /path/to/my-agent"
+  #   description: "My Custom Agent"
+
+# ─── Defaults ─────────────────────────────────────────────────
+
+defaults:
+  mode: inline                  # inline (default) | daemon | hook
+  reviewer: all                  # "all" = every enabled agent; or comma-separated: "claude,opencode"
+  max_rounds: 5                 # max review↔implement cycles
+  review_strategy: parallel     # parallel | sequential — how to run multiple reviewers
+  same_issue_threshold: 2       # same findings hash N times → force stop
+  desktop_notification: false   # true to send macOS desktop notifications via terminal-notifier
+
+# ─── Review Prompts ───────────────────────────────────────────
+# Customizable prompt templates for the reviewer.
+# Available variables:
+#   {pr_number}      — PR number
+#   {round}          — current round number
+#   {max_rounds}     — max rounds configured
+#   {pr_description} — output of `gh pr view`
+#   {pr_comments}    — previous review loop comments on the PR
+#   {pr_diff}        — output of `gh pr diff` (truncated to max_diff_bytes)
+#   {custom_context} — contents of .claude/review-context.md if it exists
+
+prompts:
+
+  # ── System preamble (always included first) ──
+  preamble: |
+    You are an independent code reviewer for PR #{pr_number} (round {round}/{max_rounds}).
+    Your job is to review the changes, evaluate previous feedback resolution, and provide actionable findings.
+    End your response with exactly one verdict line.
+
+  # ── Diff-focused review instructions ──
+  diff_review: |
+    ## Diff Review
+    Focus EXCLUSIVELY on the changed code in the diff below.
+
+    Review criteria:
+    - **Correctness**: Logic errors, off-by-one, null handling, race conditions
+    - **Security**: Input validation, injection, auth checks, secrets exposure (OWASP Top 10)
+    - **Test coverage**: New code must have tests; edge cases covered; regression tests for fixes
+    - **Quality**: DRY violations, naming clarity, appropriate abstraction level
+    - **Performance**: N+1 queries, unnecessary re-renders, missing indexes, memory leaks
+
+    For each finding:
+    - File path and line number
+    - Severity: CRITICAL / HIGH / MEDIUM / LOW
+    - Category: correctness / security / testing / quality / performance
+    - Description and suggested fix
+
+  # ── Holistic review instructions ──
+  holistic_review: |
+    ## Holistic Review
+    Evaluate the overall project structure and architecture quality.
+
+    Review criteria:
+    - **Organization**: Logical structure, separation of concerns, navigability
+    - **Dependencies**: Clean dependency graph, no circular deps, proper abstraction of externals
+    - **Error handling**: Consistent patterns, proper propagation, no swallowed errors
+    - **Configuration**: Centralized, validated at startup, env vars documented
+    - **Types**: Type coverage, no unsafe casts, proper use of generics
+
+    For each finding:
+    - Directory or file path
+    - Severity: CRITICAL / HIGH / MEDIUM / LOW
+    - Description and suggested fix
+
+  # ── Verdict instructions (always included last) ──
+  verdict_instructions: |
+    ## Verdict
+
+    ### Severity Definitions
+    - **CRITICAL**: Data loss, security breach, or production outage
+    - **HIGH**: Correctness bug in normal usage; crash-causing missing error handling
+    - **MEDIUM**: Unhandled edge case; test coverage gap; minor performance issue
+    - **LOW**: Style preference; equally-valid alternative; test organization opinion
+
+    ### Non-Blocking Items (NEVER justify CHANGES_REQUIRED or NEEDS_DISCUSSION)
+    - Code style preferences (naming, formatting, organization)
+    - Equally-valid alternative approaches that achieve the same correctness
+    - Test structure or test oracle pattern opinions
+    - "I would have done it differently" suggestions without correctness impact
+
+    ### Previous Feedback Resolution
+    If previous review feedback exists, evaluate each item:
+    - FIXED: acknowledge and move on
+    - NOT FIXED: re-raise with updated context
+    - DISAGREE (implementer provided a technically sound rebuttal): accept it — different is not wrong if both approaches are correct
+
+    ### Verdict Decision Rules (evaluate in order)
+    1. **APPROVED** (default): Use when no CRITICAL or HIGH findings remain. MEDIUM/LOW findings may be noted but do not block.
+    2. **CHANGES_REQUIRED**: Use ONLY when CRITICAL or HIGH severity findings exist that affect correctness, security, or data integrity.
+    3. **NEEDS_DISCUSSION**: Use ONLY for security architecture decisions or irreversible design choices that require human judgment — NOT for style disagreements.
+
+    End your response with EXACTLY one of these lines (nothing after it):
+    - `VERDICT: APPROVED` — all issues resolved or only LOW/MEDIUM remain
+    - `VERDICT: CHANGES_REQUIRED` — CRITICAL or HIGH issues must be addressed
+    - `VERDICT: NEEDS_DISCUSSION` — security/architecture decision requiring human input
+
+  # ── Custom context file (optional, per-project) ──
+  # If .claude/review-context.md exists in the project, its contents
+  # are injected as {custom_context} in the prompt.
+  # Use this for project-specific review guidelines, tech stack notes, etc.
+
+# ─── Output Settings ──────────────────────────────────────────
+
+output:
+  max_diff_bytes: 25600         # 25KB — truncate diff beyond this
+  pr_comment_prefix: "🔄"      # prefix for review loop comments
+  pr_comment_tag: "reviewloop"  # HTML comment tag for identifying our comments
+
+# ─── Severity Reference ───────────────────────────────────────
+# Shared definitions referenced by verdict_instructions above.
+severity_definitions:
+  CRITICAL: "Data loss, security breach, or production outage"
+  HIGH: "Correctness bug in normal usage; crash-causing missing error handling"
+  MEDIUM: "Unhandled edge case; test coverage gap; minor performance issue"
+  LOW: "Style preference; equally-valid alternative; test organization opinion"
