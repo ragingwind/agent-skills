@@ -10,6 +10,12 @@ Bidirectional implement/review exchange via GitHub PR comments. An implementer w
 - **Reviewer skip**: already-approved reviewers are skipped in subsequent rounds
 - **Review report**: structured report generated on every loop termination
 
+## Installation
+
+```bash
+npx skills add ragingwind/agent-skills --skill reviewloop
+```
+
 ## Prerequisites
 
 - `gh` CLI authenticated and working
