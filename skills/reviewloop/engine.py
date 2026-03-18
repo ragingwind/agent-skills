@@ -49,15 +49,28 @@ def get_branch_slug(cwd):
     return "default"
 
 
-def get_reviewloops_dir(cwd, branch_slug=None):
-    """Get the per-branch reviewloops directory path.
+def get_project_slug(cwd):
+    """Get a filesystem-safe slug from the project directory path.
 
-    Returns: <cwd>/.claude/reviewloops/<branch>/
+    Mirrors Claude Code's project slug convention (path separators → dashes).
+    e.g., '/Users/me/Workspaces/my-app' → 'Users-me-Workspaces-my-app'
+    """
+    normalized = os.path.normpath(cwd).lstrip(os.sep)
+    return re.sub(r"[^a-zA-Z0-9._-]", "-", normalized)
+
+
+def get_reviewloops_dir(cwd, branch_slug=None):
+    """Get the per-project, per-branch reviewloops directory path.
+
+    Returns: ~/.claude/plugins/reviewloop/<project-slug>/<branch>/
     Creates the directory if it doesn't exist.
     """
     if branch_slug is None:
         branch_slug = get_branch_slug(cwd)
-    dirpath = os.path.join(cwd, ".claude", "reviewloops", branch_slug)
+    base = os.path.join(
+        os.path.expanduser("~"), ".claude", "plugins", "reviewloop"
+    )
+    dirpath = os.path.join(base, get_project_slug(cwd), branch_slug)
     os.makedirs(dirpath, exist_ok=True)
     return dirpath
 
@@ -108,12 +121,9 @@ def notify(title, message, cwd=None, desktop=False):
     # Append to event log file (for orchestrator polling)
     if cwd:
         import datetime
-        branch_slug = get_branch_slug(cwd)
-        event_log = os.path.join(
-            cwd, ".claude", "reviewloops", branch_slug, "reviewloop-events.log"
-        )
+        rl_dir = get_reviewloops_dir(cwd)
+        event_log = os.path.join(rl_dir, "reviewloop-events.log")
         try:
-            os.makedirs(os.path.dirname(event_log), exist_ok=True)
             with open(event_log, "a") as f:
                 ts = datetime.datetime.now().strftime("%H:%M:%S")
                 f.write(f"[{ts}] {title}: {message}\n")
@@ -466,7 +476,7 @@ def main():
         hook_input = json.loads(sys.stdin.read())
         cwd = hook_input.get("cwd", os.getcwd())
 
-    # State file is per-branch under .claude/reviewloops/<branch>/
+    # State file is per-project, per-branch under ~/.claude/plugins/reviewloop/
     branch_slug = get_branch_slug(cwd)
     rl_dir = get_reviewloops_dir(cwd, branch_slug)
     state_path = os.path.join(rl_dir, "review-loop.local.md")

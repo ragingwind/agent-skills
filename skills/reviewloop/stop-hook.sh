@@ -13,10 +13,11 @@ ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
 [ -z "$CWD" ] && CWD=$(pwd)
 
-# Per-branch state file under .claude/reviewloops/<branch>/
+# Per-project, per-branch state file under ~/.claude/plugins/reviewloop/
 BRANCH=$(git -C "$CWD" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "default")
 BRANCH_SLUG=$(echo "$BRANCH" | sed 's/[^a-zA-Z0-9._-]/-/g')
-STATE="$CWD/.claude/reviewloops/$BRANCH_SLUG/review-loop.local.md"
+PROJECT_SLUG=$(echo "$CWD" | sed 's|^/||; s|[^a-zA-Z0-9._-]|-|g')
+STATE="$HOME/.claude/plugins/reviewloop/$PROJECT_SLUG/$BRANCH_SLUG/review-loop.local.md"
 [ ! -f "$STATE" ] && printf '{"decision":"approve"}\n' && exit 0
 
 # Check if loop is active (quick grep of frontmatter)

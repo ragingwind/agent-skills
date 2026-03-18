@@ -31,9 +31,9 @@ case "$ACTION" in
 
     # Read state fields
     REPO=$(grep '^repo:' "$STATE_FILE" 2>/dev/null | awk '{print $2}')
-    # state is at <cwd>/.claude/reviewloops/<branch>/review-loop.local.md
-    # Go up 4 levels: file → <branch> → reviewloops → .claude → <cwd>
-    CWD=$(dirname "$(dirname "$(dirname "$(dirname "$STATE_FILE")")")")
+    # State is at ~/.claude/plugins/reviewloop/<project>/<branch>/review-loop.local.md
+    # CWD is stored in the state file frontmatter
+    CWD=$(grep '^cwd:' "$STATE_FILE" 2>/dev/null | sed 's/^cwd: *//')
 
     if [ -z "$PR_NUMBER" ] || [ -z "$REPO" ]; then
       echo "Error: cannot read pr_number/repo from state file"
@@ -64,7 +64,7 @@ if m:
         f.write(f'---\n{fm}---\n')
 " "$STATE_FILE" "$LAST_SHA" "$$"
 
-    RLDIR=$(dirname "$STATE_FILE")  # .claude/reviewloops/<branch>
+    RLDIR=$(dirname "$STATE_FILE")  # ~/.claude/plugins/reviewloop/<project>/<branch>
     LOG_FILE="$RLDIR/reviewloop-daemon.log"
 
     # Background polling loop

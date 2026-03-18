@@ -58,7 +58,7 @@ bash ${CLAUDE_SKILL_DIR}/daemon.sh stop <state-file>
 bash ${CLAUDE_SKILL_DIR}/daemon.sh status <state-file>
 ```
 
-Log file: `<cwd>/.claude/reviewloops/<branch>/reviewloop-daemon.log`
+Log file: `~/.claude/plugins/reviewloop/<project>/<branch>/reviewloop-daemon.log`
 
 ## Mode C: Hook (Legacy)
 
@@ -86,7 +86,7 @@ This is the original behavior. Use `--mode=hook` to opt in explicitly.
 
 ## State File
 
-Location: `<cwd>/.claude/reviewloops/<branch>/review-loop.local.md`
+Location: `~/.claude/plugins/reviewloop/<project>/<branch>/review-loop.local.md`
 
 Branch slug is derived from `git rev-parse --abbrev-ref HEAD`, with non-alphanumeric characters (except `.`, `-`, `_`) replaced by `-` (e.g., `feat/auth` → `feat-auth`). This ensures per-branch isolation — multiple review loops on different branches don't interfere with each other.
 
@@ -100,6 +100,7 @@ YAML frontmatter fields:
 - `same_issue_count`: consecutive rounds with identical findings
 - `same_issue_hash`: hash of last findings for dedup
 - `approved_reviewers`: list of reviewer names that already gave APPROVED (skipped in future rounds)
+- `cwd`: project working directory (absolute path)
 - `pr_number`: the PR being reviewed
 - `repo`: owner/repo string
 - `review_id`: unique session identifier
@@ -170,7 +171,7 @@ Output: JSON with resolved reviewers, skipped agents, strategy, and command deta
 3. Validate PR exists: `gh pr view <number>`
 4. Check reviewer agent availability: run the agent's `check` command from config (using the resolved reviewer key)
 5. Detect repo: `gh repo view --json nameWithOwner -q .nameWithOwner`
-6. Create state file at `.claude/reviewloops/<branch-slug>/review-loop.local.md` (mkdir -p the directory first) with initial state — **all values MUST come from resolved config + CLI overrides, NEVER hardcode agent names**:
+6. Create state file at `~/.claude/plugins/reviewloop/<project-slug>/<branch-slug>/review-loop.local.md` (mkdir -p the directory first) with initial state — **all values MUST come from resolved config + CLI overrides, NEVER hardcode agent names**:
    ```yaml
    active: true
    mode: <resolved mode>           # from --mode flag or config defaults.mode
@@ -180,6 +181,7 @@ Output: JSON with resolved reviewers, skipped agents, strategy, and command deta
    round: 0
    same_issue_count: 0
    same_issue_hash: ''
+   cwd: <absolute project path>
    pr_number: <PR number>
    repo: <owner/repo>
    review_id: reviewloop-<PR>-events
@@ -205,7 +207,7 @@ Parse the stdout JSON:
 
 ### Cancel: `/reviewloop cancel`
 
-1. Check if `.claude/reviewloops/<branch-slug>/review-loop.local.md` exists
+1. Check if `~/.claude/plugins/reviewloop/<project-slug>/<branch-slug>/review-loop.local.md` exists
 2. If daemon mode: run `daemon.sh stop <state-file>`
 3. Report status (round, phase, reviewer, PR), post cancellation comment on PR, delete state file
 4. If not: report "No active review loop found."
