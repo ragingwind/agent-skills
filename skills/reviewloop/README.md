@@ -51,7 +51,7 @@ By default `skills add` symlinks into the agent directory, so edits to the clone
 
 ## Configuration
 
-Edit [`config.yaml`](config.yaml) to customize the review loop behavior.
+Edit [`config.yaml`](config.yaml) to customize the review loop behavior. The file is located in the skill installation directory (e.g., `~/.claude/skills/reviewloop/config.yaml`).
 
 ### Agent Registry
 
