@@ -4,7 +4,7 @@ Bidirectional implement/review exchange via GitHub PR comments. An implementer w
 
 ## Features
 
-- **3 modes**: inline (default), daemon (background polling), hook (legacy stop-hook)
+- **2 modes**: inline (default), daemon (background polling)
 - **Multi-reviewer**: run multiple agents in parallel or sequentially
 - **Auto-termination**: stops on approval, max rounds, or unresolvable disagreement
 - **Reviewer skip**: already-approved reviewers are skipped in subsequent rounds
@@ -209,7 +209,7 @@ agents:
 
 ```yaml
 defaults:
-  mode: inline              # inline | daemon | hook
+  mode: inline              # inline | daemon
   reviewer: all             # "all" or comma-separated: "claude,opencode"
   max_rounds: 5
   review_strategy: parallel # parallel | sequential

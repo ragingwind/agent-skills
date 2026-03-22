@@ -13,13 +13,12 @@ Bidirectional implement/review exchange via GitHub PR comments. An implementer (
 |------|---------|-------------|
 | **inline** | Yes | Single session: push → engine call → feedback → fix → repeat |
 | **daemon** | No | Background process polls PR for new commits, reviews automatically |
-| **hook** | No | Legacy: stop hook intercepts session end to trigger review |
 
 ## Mode A: Inline (Default)
 
 ```
 /reviewloop <PR>
-  → state file created (mode: inline)
+  → state file created
   → PR comment posted
   → Claude told: "implement, commit, push"
 
@@ -32,13 +31,13 @@ Claude automatically:
   → APPROVED → loop ends, report success
 ```
 
-The stop hook is a **no-op** in inline mode — the engine is called directly within the session. If the session ends unexpectedly, the state file persists and `/reviewloop` can resume.
+If the session ends unexpectedly, the state file persists and `/reviewloop` can resume.
 
 ## Mode B: Daemon
 
 ```
 /reviewloop <PR> --mode=daemon
-  → state file created (mode: daemon)
+  → state file created
   → daemon.sh start → background polling (30s interval)
   → Polls PR HEAD sha via gh api
 
@@ -59,18 +58,6 @@ bash ${CLAUDE_SKILL_DIR}/daemon.sh status <state-file>
 ```
 
 Log file: `~/.claude/plugins/reviewloop/<project>/<branch>/reviewloop-daemon.log`
-
-## Mode C: Hook (Legacy)
-
-```
-Implementer works → commit → push → stop session
-  → stop-hook.sh intercepts Stop event
-  → delegates to engine.py via stdin
-  → CHANGES_REQUIRED → block (feedback injected)
-  → APPROVED → approve (loop ends)
-```
-
-This is the original behavior. Use `--mode=hook` to opt in explicitly.
 
 ## Key Design
 
@@ -137,7 +124,7 @@ The aggregate verdict still counts already-approved reviewers as implicit `APPRO
 ### Start: `/reviewloop <PR number> [options]`
 
 - First argument: PR number (required, e.g., 42, #42, or full URL)
-- `--mode=<mode>`: execution mode (default: inline from config)
+- `--mode=<mode>`: execution mode — `inline` or `daemon` (default: inline from config)
 - `--reviewer=<agent>[,<agent>...]`: reviewer agent key(s), comma-separated for multiple (default: `all`). Use `all` to run every registered agent. Examples: `--reviewer=claude`, `--reviewer=claude,opencode`, `--reviewer=all`
 - `--strategy=parallel|sequential`: how to run multiple reviewers (default: config `defaults.review_strategy`)
 - `--max-rounds=<N>`: maximum rounds (default: 5)
@@ -300,14 +287,5 @@ Files and behaviors that changed during the review loop and may need test covera
 
 ## Integration
 
-- Stop hook registered in `hooks/hooks.json` — runs before other stop hooks
 - Does NOT interfere with normal sessions (no state file = passthrough)
-- Recursive stop prevention via `stop_hook_active` flag
-- Inline mode: stop hook is no-op (returns approve immediately)
 - Daemon mode: independent of session lifecycle
-
-## Backward Compatibility
-
-- State files without a `mode` field: stop hook treats them as `hook` mode (original behavior)
-- Explicit `mode: hook`: identical to the pre-inline behavior
-- Config `defaults.mode` controls the default for new loops

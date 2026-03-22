@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """Review Loop Engine — core logic for bidirectional review loop.
 
-Called by hooks/review-loop-stop.sh on Stop events, or inline via
+Invoked inline via:
   python3 engine.py --inline --cwd <path>
 
-Reads state from .claude/review-loop.local.md, invokes reviewer agent
-in the background, posts results as PR comments, and returns hook
-decision JSON.
+Or by daemon via stdin:
+  echo '{"cwd": "/path"}' | python3 engine.py
+
+Reads state from ~/.claude/plugins/reviewloop/<project>/<branch>/review-loop.local.md,
+invokes reviewer agents, posts results as PR comments, and returns a
+decision JSON (approve/block).
 """
 
 import concurrent.futures

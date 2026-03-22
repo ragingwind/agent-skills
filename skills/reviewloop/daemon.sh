@@ -117,7 +117,7 @@ if m:
         f.write(f'---\n{fm}---\n')
 " "$STATE_FILE" "$NEW_SHA"
 
-        # Invoke engine via stdin (hook mode — daemon uses the standard path)
+        # Invoke engine via stdin
         echo "{\"cwd\":\"$CWD\"}" | python3 "$PLUGIN_ROOT/engine.py" >> "$LOG_FILE" 2>&1 || true
 
         echo "[$(date -Iseconds)] Review round complete" >> "$LOG_FILE"
