@@ -4,7 +4,7 @@ Bidirectional implement/review exchange via GitHub PR comments. An implementer w
 
 ## Features
 
-- **2 modes**: inline (default), daemon (background polling)
+- **Inline loop**: push → review → fix → repeat until approved
 - **Multi-reviewer**: run multiple agents in parallel or sequentially
 - **Auto-termination**: stops on approval, max rounds, or unresolvable disagreement
 - **Reviewer skip**: already-approved reviewers are skipped in subsequent rounds
@@ -39,8 +39,8 @@ By default `skills add` symlinks into the agent directory, so edits to the clone
 # Start a review loop on PR #42
 /reviewloop 42
 
-# Use daemon mode with specific reviewers
-/reviewloop 42 --mode=daemon --reviewer=claude,opencode
+# Use specific reviewers
+/reviewloop 42 --reviewer=claude,opencode
 
 # Dry run to verify config
 /reviewloop 42 --dry-run
@@ -148,44 +148,6 @@ Aggregated verdict is `CHANGES_REQUIRED` (strictest wins). `claude` is recorded 
 
 ---
 
-### Scenario 3: Daemon Mode (Async Workflow)
-
-Start a background daemon that polls the PR every 30 seconds. The implementer can work across multiple sessions.
-
-```
-$ /reviewloop 42 --mode=daemon --reviewer=claude
-```
-
-**Daemon start output:**
-
-```
-Daemon started (PID: 18432)
-Log: ~/.claude/plugins/reviewloop/Users-alice-myapp/feat-add-validation/reviewloop-daemon.log
-```
-
-**Daemon log (`reviewloop-daemon.log`):**
-
-```
-[2026-03-19T14:00:01+09:00] Daemon started for PR #42 (alice/myapp)
-[2026-03-19T14:00:01+09:00] Baseline SHA: a1b2c3d4
-[2026-03-19T14:00:31+09:00] (no new commits — polling)
-[2026-03-19T14:01:01+09:00] (no new commits — polling)
-[2026-03-19T14:05:47+09:00] New commit detected: e5f6a7b8 (was: a1b2c3d4)
-[2026-03-19T14:05:47+09:00] Review round complete
-[2026-03-19T14:09:22+09:00] New commit detected: c9d0e1f2 (was: e5f6a7b8)
-[2026-03-19T14:09:22+09:00] Review round complete
-[2026-03-19T14:09:22+09:00] Phase is 'approved', stopping daemon
-[2026-03-19T14:09:22+09:00] Daemon stopped
-```
-
-The daemon continues running after the current session ends. To cancel it manually:
-
-```
-$ /reviewloop cancel
-```
-
----
-
 ## Configuration
 
 Edit [`config.yaml`](config.yaml) to customize the review loop behavior.
@@ -209,7 +171,6 @@ agents:
 
 ```yaml
 defaults:
-  mode: inline              # inline | daemon
   reviewer: all             # "all" or comma-separated: "claude,opencode"
   max_rounds: 5
   review_strategy: parallel # parallel | sequential

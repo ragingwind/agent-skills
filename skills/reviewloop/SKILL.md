@@ -7,14 +7,7 @@ description: Bidirectional implement/review loop via GitHub PR comments. Use whe
 
 Bidirectional implement/review exchange via GitHub PR comments. An implementer (current Claude Code session) works on code while an external reviewer agent provides feedback through PR comments.
 
-## Modes
-
-| Mode | Default | Description |
-|------|---------|-------------|
-| **inline** | Yes | Single session: push → engine call → feedback → fix → repeat |
-| **daemon** | No | Background process polls PR for new commits, reviews automatically |
-
-## Mode A: Inline (Default)
+## Flow
 
 ```
 /reviewloop <PR>
@@ -25,39 +18,13 @@ Bidirectional implement/review exchange via GitHub PR comments. An implementer (
 [Implementer: code → commit → push]
 
 Claude automatically:
-  → python3 engine.py --inline --cwd <worktree>
+  → python3 engine.py --cwd <worktree>
   → parse stdout JSON
   → CHANGES_REQUIRED → show feedback, start fixing
   → APPROVED → loop ends, report success
 ```
 
 If the session ends unexpectedly, the state file persists and `/reviewloop` can resume.
-
-## Mode B: Daemon
-
-```
-/reviewloop <PR> --mode=daemon
-  → state file created
-  → daemon.sh start → background polling (30s interval)
-  → Polls PR HEAD sha via gh api
-
-[Implementer: code → commit → push (any session)]
-
-Daemon automatically:
-  → detects new sha → engine.py → PR comment
-  → APPROVED → daemon auto-stops
-
-/reviewloop cancel → daemon.sh stop
-```
-
-Daemon management:
-```bash
-bash ${CLAUDE_SKILL_DIR}/daemon.sh start <state-file>
-bash ${CLAUDE_SKILL_DIR}/daemon.sh stop <state-file>
-bash ${CLAUDE_SKILL_DIR}/daemon.sh status <state-file>
-```
-
-Log file: `~/.claude/plugins/reviewloop/<project>/<branch>/reviewloop-daemon.log`
 
 ## Key Design
 
@@ -79,7 +46,6 @@ Branch slug is derived from `git rev-parse --abbrev-ref HEAD`, with non-alphanum
 
 YAML frontmatter fields:
 - `active`: whether loop is running
-- `mode`: `inline` | `daemon` | `hook` (default: `inline`)
 - `phase`: `implementing` | `reviewing` | `approved` | `error` | `max_rounds` | `disagreement`
 - `reviewer`: agent key from config
 - `round`: current round number
@@ -92,8 +58,6 @@ YAML frontmatter fields:
 - `repo`: owner/repo string
 - `review_id`: unique session identifier
 - `started_at`: ISO timestamp
-- `daemon_pid`: PID of background daemon (daemon mode only)
-- `last_reviewed_sha`: last reviewed commit sha (daemon mode only)
 
 ## Termination Conditions
 
@@ -117,14 +81,13 @@ The aggregate verdict still counts already-approved reviewers as implicit `APPRO
 ## Usage
 
 ```
-/reviewloop <PR> [--mode=inline|daemon|hook] [--reviewer=<agent>[,<agent>...]] [--strategy=parallel|sequential] [--max-rounds=<N>]
+/reviewloop <PR> [--reviewer=<agent>[,<agent>...]] [--strategy=parallel|sequential] [--max-rounds=<N>]
 /reviewloop cancel
 ```
 
 ### Start: `/reviewloop <PR number> [options]`
 
 - First argument: PR number (required, e.g., 42, #42, or full URL)
-- `--mode=<mode>`: execution mode — `inline` or `daemon` (default: inline from config)
 - `--reviewer=<agent>[,<agent>...]`: reviewer agent key(s), comma-separated for multiple (default: `all`). Use `all` to run every registered agent. Examples: `--reviewer=claude`, `--reviewer=claude,opencode`, `--reviewer=all`
 - `--strategy=parallel|sequential`: how to run multiple reviewers (default: config `defaults.review_strategy`)
 - `--max-rounds=<N>`: maximum rounds (default: 5)
@@ -147,21 +110,20 @@ If any reviewer says `CHANGES_REQUIRED`, the final verdict is `CHANGES_REQUIRED`
 Use `--dry-run` to verify configuration without invoking any reviewer:
 
 ```bash
-python3 engine.py --inline --cwd <path> --dry-run
+python3 engine.py --cwd <path> --dry-run
 ```
 
 Output: JSON with resolved reviewers, skipped agents, strategy, and command details. The orchestrator should run dry-run before the first real review to confirm agent availability.
 
 **Process:**
 1. Parse PR number from argument (strip `#` prefix or extract from URL)
-2. **Read config defaults**: parse `${CLAUDE_SKILL_DIR}/config.yaml` and extract `defaults.mode`, `defaults.reviewer`, `defaults.max_rounds`. CLI flags (`--mode`, `--reviewer`, `--max-rounds`) override config defaults.
+2. **Read config defaults**: parse `${CLAUDE_SKILL_DIR}/config.yaml` and extract `defaults.reviewer`, `defaults.max_rounds`. CLI flags (`--reviewer`, `--max-rounds`) override config defaults.
 3. Validate PR exists: `gh pr view <number>`
 4. Check reviewer agent availability: run the agent's `check` command from config (using the resolved reviewer key)
 5. Detect repo: `gh repo view --json nameWithOwner -q .nameWithOwner`
 6. Create state file at `~/.claude/plugins/reviewloop/<project-slug>/<branch-slug>/review-loop.local.md` (mkdir -p the directory first) with initial state — **all values MUST come from resolved config + CLI overrides, NEVER hardcode agent names**:
    ```yaml
    active: true
-   mode: <resolved mode>           # from --mode flag or config defaults.mode
    phase: implementing
    reviewer: <resolved reviewer>   # from --reviewer flag or config defaults.reviewer
    max_rounds: <resolved max>      # from --max-rounds flag or config defaults.max_rounds
@@ -175,17 +137,14 @@ Output: JSON with resolved reviewers, skipped agents, strategy, and command deta
    started_at: <ISO timestamp>
    ```
 7. Post start comment on PR: `gh pr comment <number> --body "..."`
-7. Mode-specific:
-   - **inline**: Inform implementer: "Work on the code, commit + push. I'll run the review automatically."
-   - **daemon**: Start `daemon.sh start <state-file>`, report PID and log path
-   - **hook**: Inform implementer: "Work on the code, commit + push, then stop. The stop hook will trigger review."
+8. Inform implementer: "Work on the code, commit + push. I'll run the review automatically."
 
 ### Inline Review Trigger
 
 After the implementer pushes, Claude runs the review directly:
 
 ```bash
-python3 ${CLAUDE_SKILL_DIR}/engine.py --inline --cwd <worktree-path>
+python3 ${CLAUDE_SKILL_DIR}/engine.py --cwd <worktree-path>
 ```
 
 Parse the stdout JSON:
@@ -195,9 +154,8 @@ Parse the stdout JSON:
 ### Cancel: `/reviewloop cancel`
 
 1. Check if `~/.claude/plugins/reviewloop/<project-slug>/<branch-slug>/review-loop.local.md` exists
-2. If daemon mode: run `daemon.sh stop <state-file>`
-3. Report status (round, phase, reviewer, PR), post cancellation comment on PR, delete state file
-4. If not: report "No active review loop found."
+2. Report status (round, phase, reviewer, PR), post cancellation comment on PR, delete state file
+3. If not: report "No active review loop found."
 
 ## Configuration
 
@@ -220,10 +178,7 @@ Agent registry and prompt templates: `${CLAUDE_SKILL_DIR}/config.yaml`
 |------|------|
 | `SKILL.md` | This file — protocol, rules, usage |
 | `engine.py` | Core engine (agent invocation, verdict parsing, state management) |
-| `config.yaml` | Agent registry, prompt templates, mode defaults |
-| `stop-hook.sh` | Stop hook (no-op for inline mode, delegates to engine for hook mode) |
-| `daemon.sh` | Background PR polling daemon (daemon mode) |
-| `reviewloop-watch.sh` | Log watcher (auto-switches to newest round log) |
+| `config.yaml` | Agent registry, prompt templates, defaults |
 
 ## Review Report
 
@@ -287,5 +242,4 @@ Files and behaviors that changed during the review loop and may need test covera
 
 ## Integration
 
-- Does NOT interfere with normal sessions (no state file = passthrough)
-- Daemon mode: independent of session lifecycle
+- Does NOT interfere with normal sessions (no state file = no-op)

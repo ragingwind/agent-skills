@@ -93,7 +93,6 @@ agents:
 # ─── Defaults ─────────────────────────────────────────────────
 
 defaults:
-  mode: inline                  # inline (default) | daemon
   reviewer: all                  # "all" = every enabled agent; or comma-separated: "claude,opencode"
   max_rounds: 5                 # max review↔implement cycles
   review_strategy: parallel     # parallel | sequential — how to run multiple reviewers

@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 """Review Loop Engine — core logic for bidirectional review loop.
 
-Invoked inline via:
-  python3 engine.py --inline --cwd <path>
-
-Or by daemon via stdin:
-  echo '{"cwd": "/path"}' | python3 engine.py
+Usage:
+  python3 engine.py [--cwd <path>] [--dry-run]
 
 Reads state from ~/.claude/plugins/reviewloop/<project>/<branch>/review-loop.local.md,
 invokes reviewer agents, posts results as PR comments, and returns a
@@ -467,17 +464,12 @@ def invoke_agent(agent_config, prompt_file, cwd, log_path=None):
 
 
 def main():
-    # --inline mode: read cwd from argv instead of stdin (for in-session use)
-    if "--inline" in sys.argv:
-        if "--cwd" in sys.argv:
-            idx = sys.argv.index("--cwd")
-            cwd = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else os.getcwd()
-        else:
-            cwd = os.getcwd()
-        hook_input = {"cwd": cwd}
+    if "--cwd" in sys.argv:
+        idx = sys.argv.index("--cwd")
+        cwd = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else os.getcwd()
     else:
-        hook_input = json.loads(sys.stdin.read())
-        cwd = hook_input.get("cwd", os.getcwd())
+        cwd = os.getcwd()
+    hook_input = {"cwd": cwd}
 
     # State file is per-project, per-branch under ~/.claude/plugins/reviewloop/
     branch_slug = get_branch_slug(cwd)
