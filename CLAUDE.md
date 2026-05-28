@@ -4,11 +4,9 @@ Multi-agent orchestration skills for AI coding agents — autonomous pipelines, 
 
 ## Skills
 
-### [reviewloop](skills/reviewloop/)
+### reviewloop
 
-Bidirectional implement/review loop via GitHub PR comments. Multi-reviewer, parallel execution, auto-termination.
-
-Usage: `/reviewloop <PR> [--mode=inline|daemon|hook] [--reviewer=<agent>] [--max-rounds=<N>]`
+> Moved to standalone repo: [ragingwind/reviewloop](https://github.com/ragingwind/reviewloop)
 
 ## Conventions
 
