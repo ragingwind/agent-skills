@@ -3,3 +3,4 @@ node_modules/
 *.swp
 .claude/sessions/
 .claude/cache/
+.claude/worktrees/
