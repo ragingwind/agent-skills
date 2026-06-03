@@ -50,8 +50,6 @@ Each skill must have a `SKILL.md` with:
 - Instructions section
 - Examples section (optional)
 
-See `docs/skill-anatomy.md` for the full specification.
-
 ## Script Requirements
 
 - All shell scripts must be POSIX-compatible or explicitly require bash

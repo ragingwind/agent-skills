@@ -17,10 +17,6 @@ npx skills add ragingwind/agent-skills
 /plugin install ragingwind-agent-skills@ragingwind-agent-skills
 ```
 
-### Other Editors
-
-See [docs/getting-started.md](docs/getting-started.md) for Cursor, Windsurf, Copilot, and more.
-
 ## Skills
 
 | Skill | Description |
