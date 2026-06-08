@@ -746,7 +746,7 @@ Determine the task name from the issue (kebab-case branch suffix, e.g., `my-feat
 # Compute TASK_ID / STATE_DIR / REPO inline (dev-plan may run standalone).
 # Issue number: events.jsonl init event is the source of truth.
 REPO_ROOT=$(git rev-parse --show-toplevel)
-. "$HOME/.claude/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
+. "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
 STATE_DIR=$(events_state_dir) || { echo "ERROR: cannot resolve state dir (not in a git worktree?)"; exit 1; }
 mkdir -p "$STATE_DIR"
 ISSUE=""

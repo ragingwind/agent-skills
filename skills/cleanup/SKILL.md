@@ -30,7 +30,7 @@ Environment overrides:
 - `CLEANUP_AGE_DAYS=7` (default) — skip state dirs whose `events.jsonl` was modified within N days even if the worktree/branch is gone (safety margin for in-flight work that temporarily disappears from `git branch --list`)
 
 ```bash
-. "$HOME/.claude/scripts/events.sh" 2>/dev/null || true
+. "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null || true
 HOST=$(hostname 2>/dev/null | tr '[:upper:]' '[:lower:]' | sed 's/\./-/g')
 PLUGIN_ROOT="$HOME/.local/state/agent-skills/${HOST}"
 

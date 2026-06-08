@@ -2,15 +2,15 @@
 # upload-evidence.sh — Upload evidence (screenshots or video) to GitHub Release and post PR comment.
 #
 # Usage:
-#   bash ~/.claude/skills/upload-evidence/upload-evidence.sh [--pr NUMBER] [--name TASK_NAME] [--mode screenshot|video]
+#   bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh [--pr NUMBER] [--name TASK_NAME] [--mode screenshot|video]
 #     [--section "Section header"] [--description "Blockquote context"]
 #
 # Examples:
-#   bash ~/.claude/skills/upload-evidence/upload-evidence.sh                    # auto-detect mode
-#   bash ~/.claude/skills/upload-evidence/upload-evidence.sh --pr 7
-#   bash ~/.claude/skills/upload-evidence/upload-evidence.sh --mode screenshot \
+#   bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh                    # auto-detect mode
+#   bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh --pr 7
+#   bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh --mode screenshot \
 #     --section "[A] Browser Verify — Phase 1" --description "Purpose: verify settings page rendering"
-#   bash ~/.claude/skills/upload-evidence/upload-evidence.sh --pipeline qa --mode video \
+#   bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh --pipeline qa --mode video \
 #     --section "S1: Chat flow" --description "Verify new-conversation creation and message send"
 #
 # What it does:
@@ -93,7 +93,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 # Compute TASK_ID / STATE_DIR inline.
 # Issue number: events.jsonl init event is the source of truth.
 STATE_DIR=""
-if . "$HOME/.claude/scripts/events.sh" 2>/dev/null; then
+if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null; then
   STATE_DIR=$(events_state_dir 2>/dev/null) || STATE_DIR=""
 fi
 ISSUE=""
@@ -168,7 +168,7 @@ ERROR: $OVERSIZE_FAIL screenshot(s) exceed the 1920px viewport-width limit.
        Re-capture with: agent-browser screenshot --path <file>
        (Playwright viewport-only, ~1280x720, ~100-180KB.)
 
-       See ~/.claude/skills/chrome-for-claude/SKILL.md → "Screenshot evidence".
+       See ${CLAUDE_PLUGIN_ROOT}/skills/chrome-for-claude/SKILL.md → "Screenshot evidence".
 
        Emergency bypass (will warn in PR comment): UPLOAD_EVIDENCE_ALLOW_OVERSIZE=1
 EOF

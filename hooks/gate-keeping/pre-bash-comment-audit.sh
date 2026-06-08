@@ -24,7 +24,7 @@ echo "$COMMAND" | grep -qE -- '--allow-empty|--amend([[:space:]]|$).*--no-edit' 
 
 # Emergency skip (logged)
 if [ "${CLAUDE_COMMENT_AUDIT_SKIP:-0}" = "1" ]; then
-  if . "$HOME/.claude/scripts/events.sh" 2>/dev/null \
+  if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null \
      && _sd=$(events_state_dir 2>/dev/null) && [ -d "$_sd" ] && [ -f "$_sd/events.jsonl" ]; then
     _tid=$( { events_latest "$_sd" init 2>/dev/null || true; } | jq -r '.task_id // "unknown"' 2>/dev/null || echo "unknown")
     events_emit_gate_skipped "$_sd" "${_tid:-unknown}" "pre-bash-comment-audit" "CLAUDE_COMMENT_AUDIT_SKIP" \

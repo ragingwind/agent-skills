@@ -229,7 +229,7 @@ The system is migrating to a local-authoritative event log (`events.jsonl`) unde
 
 During Phase 1 the log is **additive** — orchestrator stages record events alongside the pre-existing `$STATE_DIR/*` artifacts + GitHub gate-marker paths, and event-recording failures MUST NOT block the pipeline. Gate enforcement continues to come from GitHub comments in this phase.
 
-Helpers live in `scripts/events.sh` (source as `. "$HOME/.claude/scripts/events.sh"`). Ghost blocks are embedded in `commands/dev.md`, `commands/qa.md`, `commands/plan-dev.md`, `commands/plan-qa.md`, and `commands/epic.md`. Gate-comment posting (and the corresponding `mirror.posted` event) is handled centrally by `scripts/project_events.sh`.
+Helpers live in `scripts/events.sh` (source as `. "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh"`). Ghost blocks are embedded in `commands/dev.md`, `commands/qa.md`, `commands/plan-dev.md`, `commands/plan-qa.md`, and `commands/epic.md`. Gate-comment posting (and the corresponding `mirror.posted` event) is handled centrally by `scripts/project_events.sh`.
 
 ### Three Storage Tiers
 

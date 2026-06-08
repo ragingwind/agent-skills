@@ -17,7 +17,7 @@ Parse the argument:
 
 Run:
 ```bash
-bash ~/.claude/scripts/ghostty-split.sh [path]
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/ghostty-split.sh [path]
 ```
 
 Report the path to the user after the split opens.

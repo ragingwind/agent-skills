@@ -34,7 +34,7 @@ if echo "$_FIRST_ARG" | grep -qE '^[0-9]+$'; then
   EPIC_NUM="$_FIRST_ARG"
 else
   EPIC_NUM=""
-  if . "$HOME/.claude/scripts/events.sh" 2>/dev/null; then
+  if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null; then
     _sd=$(events_state_dir 2>/dev/null) || _sd=""
     if [ -n "$_sd" ] && [ -f "$_sd/events.jsonl" ]; then
       EPIC_NUM=$(events_latest "$_sd" init 2>/dev/null | jq -r '.issue_num // empty' 2>/dev/null || echo "")
@@ -71,7 +71,7 @@ Steps:
    Records an `init` event to the plugin-scoped `events.jsonl` for the epic branch. A failure here never aborts the pipeline.
    ```bash
    TASK_ID="${EPIC_NUM}-epic"
-   if . "$HOME/.claude/scripts/events.sh" 2>/dev/null; then
+   if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null; then
      STATE_DIR=$(events_state_dir 2>/dev/null) || STATE_DIR=""
      if [ -n "$STATE_DIR" ]; then
        mkdir -p "$STATE_DIR"
@@ -102,7 +102,7 @@ Steps:
 Run epic.ts in the background:
 
 ```bash
-bun ~/.claude/scripts/epic.ts "$EPIC_NUM" --concurrency "$CONCURRENCY" --epic-dir "$EPIC_DIR"
+bun ${CLAUDE_PLUGIN_ROOT}/scripts/epic.ts "$EPIC_NUM" --concurrency "$CONCURRENCY" --epic-dir "$EPIC_DIR"
 ```
 
 After each layer completes, epic.ts posts a layer result comment to the epic issue with `<!-- gate:epic:layer:{layer}:{EPIC_NUM} -->`:

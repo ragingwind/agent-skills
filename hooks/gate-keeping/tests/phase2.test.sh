@@ -10,8 +10,8 @@ FAIL=0
 GREEN='\033[32m'; RED='\033[31m'; RESET='\033[0m'
 
 # Path to the real hooks and helper (absolute)
-HOOKS_DIR="${HOOKS_DIR:-$HOME/.claude/hooks/gate-keeping}"
-EVENTS_SH="${EVENTS_SH:-$HOME/.claude/scripts/events.sh}"
+HOOKS_DIR="${HOOKS_DIR:-${CLAUDE_PLUGIN_ROOT}/hooks/gate-keeping}"
+EVENTS_SH="${EVENTS_SH:-${CLAUDE_PLUGIN_ROOT}/scripts/events.sh}"
 
 ok()   { printf "  ${GREEN}ok${RESET} %s\n" "$1"; PASS=$((PASS+1)); }
 bad()  { printf "  ${RED}FAIL${RESET} %s\n" "$1"; FAIL=$((FAIL+1)); }
@@ -196,7 +196,7 @@ echo "== Phase 6: content-addressed evidence verification =="
 # the hook can source it.
 _install_store_evidence() {
     local fake_home="$1"
-    cp "$HOME/.claude/scripts/store_evidence.sh" "$fake_home/.claude/scripts/store_evidence.sh"
+    cp "${CLAUDE_PLUGIN_ROOT}/scripts/store_evidence.sh" "$fake_home/.claude/scripts/store_evidence.sh"
 }
 
 # Helper — compute first 8 chars of SHA-256 for a file's contents.

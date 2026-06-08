@@ -11,8 +11,8 @@ FAIL=0
 GREEN='\033[32m'; RED='\033[31m'; RESET='\033[0m'
 
 # Path to the real hooks and helper (absolute)
-HOOKS_DIR="${HOOKS_DIR:-$HOME/.claude/hooks/gate-keeping}"
-EVENTS_SH="${EVENTS_SH:-$HOME/.claude/scripts/events.sh}"
+HOOKS_DIR="${HOOKS_DIR:-${CLAUDE_PLUGIN_ROOT}/hooks/gate-keeping}"
+EVENTS_SH="${EVENTS_SH:-${CLAUDE_PLUGIN_ROOT}/scripts/events.sh}"
 
 ok()   { printf "  ${GREEN}ok${RESET} %s\n" "$1"; PASS=$((PASS+1)); }
 bad()  { printf "  ${RED}FAIL${RESET} %s\n" "$1"; FAIL=$((FAIL+1)); }

@@ -20,6 +20,6 @@ fi
 # Clean up work directory artifacts
 BRANCH_NAME=$(git -C "$worktree_path" branch --show-current 2>/dev/null || true)
 if [ -n "$BRANCH_NAME" ]; then
-  source ~/.claude/scripts/project-paths.sh "$worktree_path" 2>/dev/null || true
+  source ${CLAUDE_PLUGIN_ROOT}/scripts/project-paths.sh "$worktree_path" 2>/dev/null || true
   rm -rf "${TESTS:-}" "${GATES_DIR:-}" 2>/dev/null || true
 fi

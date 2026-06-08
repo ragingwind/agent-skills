@@ -16,8 +16,8 @@ GREEN=$'\033[32m'; RED=$'\033[31m'; RESET=$'\033[0m'
 ok()  { printf '  %sok%s %s\n'   "$GREEN" "$RESET" "$1"; PASS=$((PASS + 1)); }
 bad() { printf '  %sFAIL%s %s\n' "$RED"   "$RESET" "$1"; FAIL=$((FAIL + 1)); }
 
-HOOKS_DIR="${HOOKS_DIR:-$HOME/.claude/hooks/gate-keeping}"
-EVENTS_SH="${EVENTS_SH:-$HOME/.claude/scripts/events.sh}"
+HOOKS_DIR="${HOOKS_DIR:-${CLAUDE_PLUGIN_ROOT}/hooks/gate-keeping}"
+EVENTS_SH="${EVENTS_SH:-${CLAUDE_PLUGIN_ROOT}/scripts/events.sh}"
 [ -x "$HOOKS_DIR/pre-bash-commit-gate.sh" ] || { echo "missing commit hook"; exit 1; }
 [ -x "$HOOKS_DIR/pre-bash-pr-gate.sh" ]     || { echo "missing pr hook"; exit 1; }
 [ -f "$EVENTS_SH" ]                         || { echo "missing events.sh"; exit 1; }

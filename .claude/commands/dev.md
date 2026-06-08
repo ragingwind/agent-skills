@@ -208,7 +208,7 @@ REVIEW_REPORT=$(find "$STATE_DIR" -maxdepth 1 -name "*-review*.md" -print0 \
   | xargs -0 ls -t 2>/dev/null | head -1)
 if [ -n "$REVIEW_REPORT" ] && [ -n "${PR_NUM:-}" ]; then
   COMMIT_SHA=$(git rev-parse HEAD)
-  bash "$HOME/.claude/scripts/post-deferred-inline.sh" \
+  bash "${CLAUDE_PLUGIN_ROOT}/scripts/post-deferred-inline.sh" \
     "$REVIEW_REPORT" "$PR_NUM" "$REPO" "$COMMIT_SHA" \
     || echo "post-deferred-inline: non-fatal — see stderr" >&2
 fi
@@ -340,7 +340,7 @@ There is no task file — stage logs live in `$STATE_DIR` (`$HOME/.local/state/a
 # Compute task context — orchestrator runs this ONCE in SETUP
 REPO_ROOT=$(git rev-parse --show-toplevel)
 # STATE_DIR is the single per-branch artifact + events.jsonl location.
-. "$HOME/.claude/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
+. "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
 STATE_DIR=$(events_state_dir) || { echo "ERROR: cannot resolve state dir (not in a git worktree?)"; exit 1; }
 mkdir -p "$STATE_DIR"
 
@@ -578,7 +578,7 @@ Gate verification happens at three layers:
      # Stamp content-addressed suffix on any unhashed evidence under
      # $STATE_DIR/evidence/ (Phase 6b). Idempotent — a no-op when files are
      # already named <logical>.<hash8>.<ext>.
-     . "$HOME/.claude/scripts/store_evidence.sh" 2>/dev/null || true
+     . "${CLAUDE_PLUGIN_ROOT}/scripts/store_evidence.sh" 2>/dev/null || true
      store_evidence_migrate "$STATE_DIR" 2>/dev/null || true
 
      # Select evidence glob + writer by stage (see glob-to-stage table below).
@@ -637,7 +637,7 @@ Gate verification happens at three layers:
      # Idempotent (records mirror.posted per event); safe to re-run. On failure,
      # fall back to manually running `gh pr comment` with the gate marker body —
      # see the orchestrator narrative in commands/dev.md L560 for the fallback contract.
-     bash "$HOME/.claude/scripts/project_events.sh" post "$STATE_DIR" \
+     bash "${CLAUDE_PLUGIN_ROOT}/scripts/project_events.sh" post "$STATE_DIR" \
        2>&1 | sed 's/^/projector: /' || true
    fi
    ```
@@ -703,7 +703,7 @@ When a session resumes after context compression:
 1. **Re-initialize task context** — run the inline snippet below to restore `TASK_ID`, `STATE_DIR`, `REPO`:
    ```bash
    REPO_ROOT=$(git rev-parse --show-toplevel)
-   . "$HOME/.claude/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
+   . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
    STATE_DIR=$(events_state_dir) || { echo "ERROR: cannot resolve state dir"; exit 1; }
    [ -f "$STATE_DIR/events.jsonl" ] || { echo "ERROR: no events.jsonl — session cannot be resumed"; exit 1; }
    ISSUE=$(events_latest "$STATE_DIR" init 2>/dev/null | jq -r '.issue_num // empty' 2>/dev/null || echo "")

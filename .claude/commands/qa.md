@@ -169,7 +169,7 @@ Orchestrator resolves natural-language hints via `git log/tag/describe`, display
 # Compute task context — orchestrator runs this ONCE in SETUP
 REPO_ROOT=$(git rev-parse --show-toplevel)
 # STATE_DIR is the single per-branch artifact + events.jsonl location.
-. "$HOME/.claude/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
+. "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
 STATE_DIR=$(events_state_dir) || { echo "ERROR: cannot resolve state dir (not in a git worktree?)"; exit 1; }
 mkdir -p "$STATE_DIR"
 
@@ -500,7 +500,7 @@ evidence under `$STATE_DIR/evidence/` to the `<logical>.<hash8>.<ext>` form
 and collects the resulting filenames into the event's `evidence` array:
 
 ```bash
-. "$HOME/.claude/scripts/store_evidence.sh" 2>/dev/null || true
+. "${CLAUDE_PLUGIN_ROOT}/scripts/store_evidence.sh" 2>/dev/null || true
 store_evidence_migrate "$STATE_DIR" 2>/dev/null || true
 
 # QA scenario evidence uses the `s<N>-...` logical-name convention (video
@@ -531,7 +531,7 @@ events_emit_stage_passed "$STATE_DIR" "$TASK_ID" tester verify <ITER> "$DH" \
 
 # Phase 3 projector — mirror the just-emitted stage.passed(verify) to GitHub.
 # Idempotent; on failure, fall back to manual gh pr comment with the gate marker.
-bash "$HOME/.claude/scripts/project_events.sh" post "$STATE_DIR" \
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/project_events.sh" post "$STATE_DIR" \
   2>&1 | sed 's/^/projector: /' || true
 ```
 

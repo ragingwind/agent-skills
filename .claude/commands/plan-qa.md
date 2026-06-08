@@ -87,7 +87,7 @@ case " $ARGUMENTS " in *" --approved "*) APPROVED=1 ;; esac
 ```bash
 REPO_ROOT=$(git rev-parse --show-toplevel)
 # STATE_DIR is the single per-branch artifact + events.jsonl location.
-. "$HOME/.claude/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
+. "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" || { echo "ERROR: scripts/events.sh missing"; exit 1; }
 STATE_DIR=$(events_state_dir) || { echo "ERROR: cannot resolve state dir (not in a git worktree?)"; exit 1; }
 mkdir -p "$STATE_DIR"
 

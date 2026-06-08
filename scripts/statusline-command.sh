@@ -133,11 +133,11 @@ if [ -z "$issue_num" ] && [ -n "$branch" ]; then
 fi
 
 # Tier 3: events.jsonl init event
-if [ -z "$issue_num" ] && [ -f "$HOME/.claude/scripts/events.sh" ]; then
-  if ( . "$HOME/.claude/scripts/events.sh" 2>/dev/null ); then
-    _sd=$(cd "${cwd:-.}" && . "$HOME/.claude/scripts/events.sh" 2>/dev/null && events_state_dir 2>/dev/null || echo "")
+if [ -z "$issue_num" ] && [ -f "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" ]; then
+  if ( . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null ); then
+    _sd=$(cd "${cwd:-.}" && . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null && events_state_dir 2>/dev/null || echo "")
     if [ -n "$_sd" ] && [ -f "$_sd/events.jsonl" ]; then
-      issue_num=$(cd "${cwd:-.}" && . "$HOME/.claude/scripts/events.sh" 2>/dev/null \
+      issue_num=$(cd "${cwd:-.}" && . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null \
         && events_latest "$_sd" init 2>/dev/null \
         | jq -r '.issue_num // empty' 2>/dev/null || echo "")
     fi
@@ -168,7 +168,7 @@ fi
 
 # -- Dev server statusline extension ──────────────────────────
 ext_display=""
-ext_script="$HOME/.claude/scripts/statusline-ext.sh"
+ext_script="${CLAUDE_PLUGIN_ROOT}/scripts/statusline-ext.sh"
 if [ -n "$project_root" ] && [ -f "$ext_script" ]; then
   ext_display=$(bash "$ext_script" "$project_root" "$project_key" "$cwd" 2>/dev/null)
 fi

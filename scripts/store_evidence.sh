@@ -365,5 +365,5 @@ check_cutover_consistency() {
 }
 
 # This file is intended to be sourced:
-#   . "$HOME/.claude/scripts/store_evidence.sh"
+#   . "${CLAUDE_PLUGIN_ROOT}/scripts/store_evidence.sh"
 # Callers invoke store_evidence / store_evidence_verify as shell functions.

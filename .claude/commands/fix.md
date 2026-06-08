@@ -33,7 +33,7 @@ SETUP → [CREATE ISSUE] → BRANCH → PUSH → DRAFT PR
 ```bash
 REPO=$(git remote get-url origin | sed -e 's#^.*github\.com[:/]##' -e 's#\.git$##')
 REPO_ROOT=$(git rev-parse --show-toplevel)
-. "$HOME/.claude/scripts/events.sh" || { echo "ERROR: events.sh missing"; exit 1; }
+. "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" || { echo "ERROR: events.sh missing"; exit 1; }
 
 # Resolve trunk
 _TRUNK=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null \

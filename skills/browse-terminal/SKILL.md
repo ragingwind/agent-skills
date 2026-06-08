@@ -32,13 +32,13 @@ When the URL is omitted, the default is: `https://example.com`
 
 ```bash
 # Open
-bash ~/.claude/scripts/ghostty-browse-tab.sh [--tab|--pane] [URL]
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/ghostty-browse-tab.sh [--tab|--pane] [URL]
 
 # Watch a file + auto-reload (e.g., refresh the Slidev view when slides.md is edited)
-bash ~/.claude/scripts/ghostty-browse-tab.sh --pane --watch slides.md http://localhost:3030
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/ghostty-browse-tab.sh --pane --watch slides.md http://localhost:3030
 
 # Close
-bash ~/.claude/scripts/ghostty-browse-tab.sh close [--tab|--pane]
+bash ${CLAUDE_PLUGIN_ROOT}/scripts/ghostty-browse-tab.sh close [--tab|--pane]
 ```
 
 ## How --watch works

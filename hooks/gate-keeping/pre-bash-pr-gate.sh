@@ -52,7 +52,7 @@ echo "$COMMAND" | grep -qE -- '--draft\b' && IS_DRAFT=true
 
 # Emergency skip (logged + recorded to events.jsonl if available)
 if [ "${CLAUDE_EVENTS_HOOK_SKIP:-0}" = "1" ]; then
-  if . "$HOME/.claude/scripts/events.sh" 2>/dev/null \
+  if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null \
      && _sd=$(events_state_dir 2>/dev/null) && [ -d "$_sd" ] && [ -f "$_sd/events.jsonl" ]; then
     # Corrupt events.jsonl would make `events_latest | jq` fail under pipefail.
     _tid=$( { events_latest "$_sd" init 2>/dev/null || true; } | jq -r '.task_id // "unknown"' 2>/dev/null || echo "unknown")
@@ -76,9 +76,9 @@ if [ ! -f "$REPO_ROOT/package.json" ] && [ ! -f "$REPO_ROOT/turbo.json" ]; then
 fi
 
 # ---------- Phase 4: events.jsonl primary read (fail-closed when absent) ----------
-if [ -f "$HOME/.claude/scripts/events.sh" ]; then
+if [ -f "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" ]; then
   # shellcheck disable=SC1091
-  if . "$HOME/.claude/scripts/events.sh" 2>/dev/null; then
+  if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null; then
     _EV_STATE_DIR=$(events_state_dir 2>/dev/null || echo "")
 
     # ---------- Gate comment: enforce evidence.uploaded before gate:build/verify ----------
@@ -128,7 +128,7 @@ if [ -f "$HOME/.claude/scripts/events.sh" ]; then
               '/^worktree/{wt=$2} $0==("branch " br){print wt; exit}')
           if [ -n "$_HEAD_WT" ] && [ -d "$_HEAD_WT" ]; then
             _DRAFT_SD=$(cd "$_HEAD_WT" \
-              && . "$HOME/.claude/scripts/events.sh" 2>/dev/null \
+              && . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null \
               && events_state_dir 2>/dev/null || echo "")
           fi
         fi
@@ -164,9 +164,9 @@ if [ -f "$HOME/.claude/scripts/events.sh" ]; then
       # this check catches that bypass at PR-creation time.
       _DRAFT_PLAN="$_DRAFT_SD/plan.md"
       if [ -f "$_DRAFT_PLAN" ] \
-         && [ -f "$HOME/.claude/scripts/store_evidence.sh" ] \
+         && [ -f "${CLAUDE_PLUGIN_ROOT}/scripts/store_evidence.sh" ] \
          && command -v check_evidence_parity >/dev/null 2>&1; then
-        . "$HOME/.claude/scripts/store_evidence.sh" 2>/dev/null || true
+        . "${CLAUDE_PLUGIN_ROOT}/scripts/store_evidence.sh" 2>/dev/null || true
         _EV_MODE=$(grep -E '^evidence-mode:' "$_DRAFT_PLAN" | head -1 | sed 's/^evidence-mode:[[:space:]]*//')
         if [ "$_EV_MODE" != "none" ]; then
           _FLOWS=$(grep -E '^evidence-flows:' "$_DRAFT_PLAN" | head -1 | sed 's/^evidence-flows:[[:space:]]*//')
@@ -230,9 +230,9 @@ if [ -f "$HOME/.claude/scripts/events.sh" ]; then
       # outright (the 6a backward-compat pass-through has been removed). When
       # the helper itself is missing we still fall back to trusting the emitter
       # so a botched $HOME/.claude layout doesn't wedge PR creation globally.
-      if [ -f "$HOME/.claude/scripts/store_evidence.sh" ]; then
+      if [ -f "${CLAUDE_PLUGIN_ROOT}/scripts/store_evidence.sh" ]; then
         # shellcheck disable=SC1091
-        . "$HOME/.claude/scripts/store_evidence.sh" 2>/dev/null || true
+        . "${CLAUDE_PLUGIN_ROOT}/scripts/store_evidence.sh" 2>/dev/null || true
         _EV_BAD=""
         for _stage_ev in "$_EV_BUILD" "$_EV_VERIFY"; do
           _ev_list=$(printf '%s' "$_stage_ev" | jq -r '.evidence[]? // empty' 2>/dev/null || echo "")
@@ -347,7 +347,7 @@ EV_LIST_EOF
             done
           fi
           if [ "$_PROD_OK" -lt 1 ]; then
-            printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: plan.md declares cutover-phase: true but no evidence under %s/evidence/ has production_path_exercised: true with non-mock harness in its .metadata.json. Cutover phases require real-environment verification (real server + real browser + real session). Round-trip / unit-test-mock evidence is insufficient. See ~/.claude/rules/orchestration.md \\"Cutover phase contract\\"."}}\n' "$_EV_STATE_DIR"
+            printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: plan.md declares cutover-phase: true but no evidence under %s/evidence/ has production_path_exercised: true with non-mock harness in its .metadata.json. Cutover phases require real-environment verification (real server + real browser + real session). Round-trip / unit-test-mock evidence is insufficient. See ${CLAUDE_PLUGIN_ROOT}/rules/orchestration.md \\"Cutover phase contract\\"."}}\n' "$_EV_STATE_DIR"
             exit 0
           fi
         fi

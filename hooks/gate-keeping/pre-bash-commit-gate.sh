@@ -24,7 +24,7 @@ echo "$COMMAND" | grep -qE '\-\-allow-empty|--amend\b.*--no-edit' && exit 0
 
 # Emergency skip (logged + recorded to events.jsonl if available)
 if [ "${CLAUDE_EVENTS_HOOK_SKIP:-0}" = "1" ]; then
-  if . "$HOME/.claude/scripts/events.sh" 2>/dev/null \
+  if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null \
      && _sd=$(events_state_dir 2>/dev/null) && [ -d "$_sd" ] && [ -f "$_sd/events.jsonl" ]; then
     # Corrupt events.jsonl would make `events_latest | jq` fail under pipefail.
     # Wrap in `|| true` so skip emission never blocks the bypass itself.
@@ -50,10 +50,10 @@ if [ ! -f "$REPO_ROOT/package.json" ] && [ ! -f "$REPO_ROOT/turbo.json" ]; then
 fi
 
 # ---------- Phase 4: events.jsonl primary read (fail-closed when absent) ----------
-if [ -f "$HOME/.claude/scripts/events.sh" ]; then
+if [ -f "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" ]; then
   # Load silently; failure here means the helper is broken — fall through.
   # shellcheck disable=SC1091
-  if . "$HOME/.claude/scripts/events.sh" 2>/dev/null; then
+  if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null; then
     _EV_STATE_DIR=$(events_state_dir 2>/dev/null || echo "")
     if [ -n "$_EV_STATE_DIR" ] && [ -f "$_EV_STATE_DIR/events.jsonl" ]; then
       # Present — events is authoritative; validate and enforce.

@@ -37,7 +37,7 @@ set -u
 _proj_die() { echo "project_events: $*" >&2; return 1; }
 
 _proj_require_helper() {
-    local sh="$HOME/.claude/scripts/events.sh"
+    local sh="${CLAUDE_PLUGIN_ROOT}/scripts/events.sh"
     [ -f "$sh" ] || { _proj_die "events.sh not found at $sh"; return 1; }
     # shellcheck disable=SC1090
     . "$sh" || { _proj_die "failed to source events.sh"; return 1; }

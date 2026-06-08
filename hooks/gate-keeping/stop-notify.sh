@@ -14,11 +14,11 @@ BRANCH=$(git -C "$CWD" branch --show-current 2>/dev/null)
 
 # Issue number: events.jsonl init event is the source of truth.
 ISSUE=""
-if [ -f "$HOME/.claude/scripts/events.sh" ]; then
-  if ( . "$HOME/.claude/scripts/events.sh" 2>/dev/null ); then
-    _sd=$(cd "$CWD" && . "$HOME/.claude/scripts/events.sh" 2>/dev/null && events_state_dir 2>/dev/null || echo "")
+if [ -f "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" ]; then
+  if ( . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null ); then
+    _sd=$(cd "$CWD" && . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null && events_state_dir 2>/dev/null || echo "")
     if [ -n "$_sd" ] && [ -f "$_sd/events.jsonl" ]; then
-      ISSUE=$(cd "$CWD" && . "$HOME/.claude/scripts/events.sh" 2>/dev/null \
+      ISSUE=$(cd "$CWD" && . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null \
         && events_latest "$_sd" init 2>/dev/null \
         | jq -r '.issue_num // empty' 2>/dev/null || echo "")
     fi

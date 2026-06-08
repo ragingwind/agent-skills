@@ -30,10 +30,10 @@ Upload renames to PR-scoped: `pr{N}-{basename}.{ext}`
 Run the script — all hard rules are enforced by code:
 
 ```bash
-bash ~/.claude/skills/upload-evidence/upload-evidence.sh
-bash ~/.claude/skills/upload-evidence/upload-evidence.sh --pr 7
-bash ~/.claude/skills/upload-evidence/upload-evidence.sh --mode screenshot
-bash ~/.claude/skills/upload-evidence/upload-evidence.sh --mode video --name mobile-nav-overlap
+bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh
+bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh --pr 7
+bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh --mode screenshot
+bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh --mode video --name mobile-nav-overlap
 ```
 
 See [upload-evidence.sh](upload-evidence.sh) for implementation.

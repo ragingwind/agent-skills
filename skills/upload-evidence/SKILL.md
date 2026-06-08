@@ -43,9 +43,9 @@ Skill(skill: "upload-evidence", args: "--pipeline qa --mode video --section 'S1:
 ## Execution
 
 ```bash
-bash ~/.claude/skills/upload-evidence/upload-evidence.sh
-bash ~/.claude/skills/upload-evidence/upload-evidence.sh --pr 7
-bash ~/.claude/skills/upload-evidence/upload-evidence.sh \
+bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh
+bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh --pr 7
+bash ${CLAUDE_PLUGIN_ROOT}/skills/upload-evidence/upload-evidence.sh \
   --mode screenshot \
   --section "[A] Browser Verify — Phase 1" \
   --description "Purpose: verify settings page rendering"

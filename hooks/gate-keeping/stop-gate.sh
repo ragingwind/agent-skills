@@ -11,7 +11,7 @@ ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null)
 
 # Phase 4 emergency skip (logged + recorded to events.jsonl if available)
 if [ "${CLAUDE_EVENTS_HOOK_SKIP:-0}" = "1" ]; then
-  if . "$HOME/.claude/scripts/events.sh" 2>/dev/null \
+  if . "${CLAUDE_PLUGIN_ROOT}/scripts/events.sh" 2>/dev/null \
      && _sd=$(events_state_dir 2>/dev/null) && [ -d "$_sd" ] && [ -f "$_sd/events.jsonl" ]; then
     # Corrupt events.jsonl would make `events_latest | jq` fail under pipefail.
     _tid=$( { events_latest "$_sd" init 2>/dev/null || true; } | jq -r '.task_id // "unknown"' 2>/dev/null || echo "unknown")
