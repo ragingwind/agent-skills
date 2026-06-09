@@ -488,9 +488,14 @@ events_emit_stage_passed() {
 
             # Check 1: disk-based — browser-verify files on disk require upload even
             # before commits are made (git diff is blind to uncommitted changes).
-            _disk_evidence=$(find "$sd/evidence" -maxdepth 1 \
-                \( -name 'browser-verify-*.png' -o -name 'browser-verify-*.webm' \) \
-                2>/dev/null | wc -l | tr -d ' ')
+            # Callers may run under set -e/pipefail; find must not fail the pipeline
+            # when evidence/ does not exist yet.
+            _disk_evidence=0
+            if [ -d "$sd/evidence" ]; then
+                _disk_evidence=$(find "$sd/evidence" -maxdepth 1 \
+                    \( -name 'browser-verify-*.png' -o -name 'browser-verify-*.webm' \) \
+                    2>/dev/null | wc -l | tr -d ' ')
+            fi
             if [ "${_disk_evidence:-0}" -gt 0 ]; then
                 _ui_uploaded=$(jq -c --arg s "$stage" --argjson it "$iter" \
                     'select(.type=="evidence.uploaded" and .stage==$s and .iteration==$it)' \
@@ -509,8 +514,10 @@ events_emit_stage_passed() {
                 _wt_root=$(printf '%s' "$_init_ev" | jq -r '.worktree_root // empty' 2>/dev/null)
                 _base_branch=$(printf '%s' "$_init_ev" | jq -r '.base_branch // "canary"' 2>/dev/null)
                 if [ -n "$_wt_root" ] && [ -d "$_wt_root" ]; then
-                    _ui_lines=$(git -C "$_wt_root" diff "origin/${_base_branch}...HEAD" \
-                        -- '*.tsx' '*.jsx' '*.css' '*.svg' 2>/dev/null | wc -l | tr -d ' ')
+                    # { ...|| true; } keeps pipefail callers alive when the base
+                    # ref doesn't exist (e.g. repo without an origin remote).
+                    _ui_lines=$({ git -C "$_wt_root" diff "origin/${_base_branch}...HEAD" \
+                        -- '*.tsx' '*.jsx' '*.css' '*.svg' 2>/dev/null || true; } | wc -l | tr -d ' ')
                     if [ "${_ui_lines:-0}" -gt 0 ]; then
                         _ui_uploaded=$(jq -c --arg s "$stage" --argjson it "$iter" \
                             'select(.type=="evidence.uploaded" and .stage==$s and .iteration==$it)' \

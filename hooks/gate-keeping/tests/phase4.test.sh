@@ -80,14 +80,15 @@ echo "== Phase 4: fail-closed entry (T10) =="
 SBX=$(mktemp -d)
 trap "rm -rf '$SBX'" EXIT
 
-# ---- T10a: no events.jsonl → commit-gate denies (Phase 5: no legacy escape hatch) ----
+# ---- T10a: no events.jsonl → commit-gate skips (not a pipeline branch) ----
+# Fail-closed entry on absent events.jsonl is enforced at PR creation (T10b),
+# not on direct commits outside a pipeline.
 T_HOME="$SBX/t10a"; _make_sandbox "$T_HOME"
-OUT=$(_run_hook pre-bash-commit-gate.sh '{"tool_input":{"command":"git commit -m test"}}' "$T_HOME")
-if echo "$OUT" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1 \
-   && echo "$OUT" | grep -qF 'events.jsonl not found'; then
-    ok "T10a commit-gate: absent events.jsonl → deny"
+OUT=$(_run_hook pre-bash-commit-gate.sh '{"tool_input":{"command":"git commit -m test"}}' "$T_HOME" 2>/dev/null)
+if [ -z "$OUT" ]; then
+    ok "T10a commit-gate: absent events.jsonl → skip (not a pipeline branch)"
 else
-    bad "T10a expected deny mentioning 'events.jsonl not found', got: $OUT"
+    bad "T10a expected allow (gate skip), got: $OUT"
 fi
 
 # ---- T10b: no events.jsonl → pr-gate denies (Phase 5: no legacy escape hatch) ----
@@ -103,16 +104,24 @@ fi
 # ==============================================================
 echo "== Phase 5: CLAUDE_EVENTS_HOOK_LEGACY is a no-op (T11) =="
 
-# ---- T11a: CLAUDE_EVENTS_HOOK_LEGACY=1 must NOT bypass fail-closed ----
+# ---- T11a: CLAUDE_EVENTS_HOOK_LEGACY=1 must NOT bypass the commit gate ----
+# Seed events.jsonl with init only (no stage.passed(build)) so the gate is
+# active, then assert LEGACY=1 does not turn the deny into an allow.
 T_HOME="$SBX/t11a"; _make_sandbox "$T_HOME"
+SD=$(_state_dir_for "$T_HOME" "$T_HOME/repo")
+mkdir -p "$SD"
+(
+    HOME="$T_HOME" . "$T_HOME/.claude/scripts/events.sh"
+    events_emit_init "$SD" "42-sample" "acme/repo" 42 "feat/sample" main main "$T_HOME/repo"
+)
 OUT=$(
     cd "$T_HOME/repo"
     HOME="$T_HOME" CLAUDE_EVENTS_HOOK_LEGACY=1 bash "$HOOKS_DIR/pre-bash-commit-gate.sh" \
       <<< '{"tool_input":{"command":"git commit -m test"}}' 2>/dev/null
 )
 if echo "$OUT" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1 \
-   && echo "$OUT" | grep -qF 'events.jsonl not found'; then
-    ok "T11a commit-gate: LEGACY=1 is ignored — still fail-closed when events.jsonl absent"
+   && echo "$OUT" | grep -qF 'no stage.passed(build)'; then
+    ok "T11a commit-gate: LEGACY=1 is ignored — still denies without build pass"
 else
     bad "T11a expected LEGACY=1 to be no-op (still deny), got: $OUT"
 fi

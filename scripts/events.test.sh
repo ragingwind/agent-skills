@@ -359,6 +359,10 @@ assert_ok "emit_stage_started appends" $?
 events_emit_stage_passed "$EMIT_SD" "123-feat-auth" "builder" "build" 1 "dh0001" "unit 10/10"
 assert_ok "emit_stage_passed (non-verify, no writer) appends" $?
 
+# Non-empty evidence requires a preceding evidence.uploaded event (HARD GATE).
+events_emit_evidence_uploaded "$EMIT_SD" "123-feat-auth" "verify" 1 2 '["https://gh/rel/sha1","https://gh/rel/sha2"]'
+assert_ok "emit_evidence_uploaded appends" $?
+
 events_emit_stage_passed "$EMIT_SD" "123-feat-auth" "builder" "verify" 1 "dh0001" "tia ok" "builder" '["sha1","sha2"]'
 assert_ok "emit_stage_passed (verify with writer) appends" $?
 
@@ -386,9 +390,9 @@ assert_ok "emit_finalize_pr_ready appends" $?
 events_validate "$EMIT_SD/events.jsonl"
 assert_ok "emitted log passes full validation" $?
 
-# Line count sanity (1 init + 1 started + 2 passed + 1 failed + 1 plan + 1 mirror + 1 finalize = 8)
+# Line count sanity (1 init + 1 started + 1 uploaded + 2 passed + 1 failed + 1 plan + 1 mirror + 1 finalize = 9)
 LINE_COUNT=$(wc -l < "$EMIT_SD/events.jsonl" | tr -d ' ')
-assert_eq "emit log has 8 lines" "8" "$LINE_COUNT"
+assert_eq "emit log has 9 lines" "9" "$LINE_COUNT"
 
 # ---------- section 7b: orchestrator token guard ----------
 

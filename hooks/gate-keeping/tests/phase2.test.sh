@@ -57,13 +57,13 @@ echo "== Phase 2: pre-bash-commit-gate.sh =="
 SBX=$(mktemp -d)
 trap "rm -rf '$SBX'" EXIT
 
-# ---- T1: no events.jsonl → deny (Phase 5: fail-closed, no legacy escape hatch) ----
+# ---- T1: no events.jsonl → skip (not a pipeline branch; direct commits allowed) ----
+# Fail-closed on absent events.jsonl applies to PR creation only (pre-bash-pr-gate).
 T_HOME="$SBX/t1"; _make_sandbox "$T_HOME"
-OUT=$(_run_hook pre-bash-commit-gate.sh '{"tool_input":{"command":"git commit -m test"}}' "$T_HOME")
-if echo "$OUT" | jq -e '.hookSpecificOutput.permissionDecision == "deny"' >/dev/null 2>&1 \
-   && echo "$OUT" | grep -qF 'events.jsonl not found'; then
-    ok "T1 absent events.jsonl → fail-closed deny"
-else bad "T1 expected deny mentioning 'events.jsonl not found', got: $OUT"; fi
+OUT=$(_run_hook pre-bash-commit-gate.sh '{"tool_input":{"command":"git commit -m test"}}' "$T_HOME" 2>/dev/null)
+if [ -z "$OUT" ]; then
+    ok "T1 absent events.jsonl → commit-gate skips (not a pipeline branch)"
+else bad "T1 expected allow (gate skip), got: $OUT"; fi
 
 # ---- T2: events.jsonl present + valid + build.passed → allow ----
 T_HOME="$SBX/t2"; _make_sandbox "$T_HOME"
@@ -207,13 +207,19 @@ _hash8_file() {
 _seed_stages_with_evidence() {
     # Emits init + build-pass + review-APPROVED + verify-pass with the given
     # evidence JSON array. Must be called in a subshell that has HOME set
-    # and events.sh sourced.
+    # and events.sh sourced. Non-empty evidence requires a preceding
+    # evidence.uploaded event per stage (HARD GATE in events_emit_stage_passed);
+    # the file-level hash verification under test here happens later, in the
+    # PR-gate hook.
     local sd="$1" repo_root="$2" evidence_json="$3"
     events_emit_init "$sd" "42-sample" "acme/repo" 42 "feat/sample" main main "$repo_root"
     export ORCHESTRATOR_TOKEN=$(cat "$sd/.orch-writer-token")
     local DH=$(events_diff_hash main 2>/dev/null || echo 0000000000000000)
+    local EV_COUNT=$(printf '%s' "$evidence_json" | jq 'length')
+    events_emit_evidence_uploaded "$sd" "42-sample" build 1 "$EV_COUNT" '[]'
     events_emit_stage_passed "$sd" "42-sample" builder  build  1 "$DH" "build ok" ""      "$evidence_json"
     events_emit_stage_passed "$sd" "42-sample" reviewer review 1 "$DH" "APPROVED"
+    events_emit_evidence_uploaded "$sd" "42-sample" verify 1 "$EV_COUNT" '[]'
     events_emit_stage_passed "$sd" "42-sample" builder  verify 1 "$DH" "tia pass" builder "$evidence_json"
 }
 

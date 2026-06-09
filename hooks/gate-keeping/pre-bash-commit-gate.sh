@@ -5,7 +5,8 @@
 #   - Valid log with stage.passed(build) → allow.
 #   - Valid log without build pass        → deny with actionable message.
 #   - Invalid log                         → deny (fail-closed on ambiguity).
-#   - events.jsonl absent                 → deny (run /dev <issue> to initialize).
+#   - events.jsonl absent                 → skip (not a pipeline branch; direct
+#     commits allowed — PR creation stays fail-closed via pre-bash-pr-gate.sh).
 #
 # Emergency escape hatch: CLAUDE_EVENTS_HOOK_SKIP=1 (logged to stderr).
 #
