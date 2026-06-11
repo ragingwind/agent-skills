@@ -6,5 +6,6 @@
   "homepage": "https://github.com/ragingwind/agent-skills",
   "repository": "https://github.com/ragingwind/agent-skills",
   "license": "MIT",
-  "commands": "./.claude/commands"
+  "commands": "./.claude/commands",
+  "hooks": "./hooks/hooks.json"
 }

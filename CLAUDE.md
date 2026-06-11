@@ -22,13 +22,20 @@ symlinks to it.
 > symlink to `CLAUDE.md` (e.g. `GEMINI.md`, `AGENT.md`,
 > `.github/copilot-instructions.md`) — no content is duplicated.
 
-## Skills
+## Layout
 
-Each skill lives in `skills/<skill-name>/SKILL.md`.
+| Path | Contents |
+|------|----------|
+| `skills/<name>/SKILL.md` | 26 skills — orchestration, browser/E2E verification, web, language experts, utilities |
+| `.claude/commands/*.md` | 8 pipeline slash commands — dev, qa, epic, fix, plan-dev, plan-qa, ralph, swarm |
+| `agents/*.md` | 4 personas — builder, reviewer, tester, debugger |
+| `rules/*.md` | 7 orchestration rules referenced by commands/agents/skills |
+| `scripts/`, `hooks/gate-keeping/` | Pipeline dependencies — events, evidence, and gate hooks |
 
-| Skill | Description |
-|-------|-------------|
-| reviewloop | Moved to standalone repo: [ragingwind/reviewloop](https://github.com/ragingwind/reviewloop) |
+See [README.md](README.md) for the full skill/command/agent catalog with descriptions.
+
+> Plugin-internal asset references use `${CLAUDE_PLUGIN_ROOT}/...` (not `~/.claude/...`),
+> while genuine runtime state stays under `$HOME/.local/state/agent-skills/...`.
 
 ## Conventions
 
