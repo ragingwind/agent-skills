@@ -1,7 +1,7 @@
 ---
 paths:
   - ".github/**"
-  - "**/.claude/commands/**"
+  - "**/commands/**"
 ---
 
 # Labels

@@ -19,18 +19,18 @@ npx skills add ragingwind/agent-skills
 
 ## Pipelines
 
-Slash commands that orchestrate the multi-agent pipeline (`.claude/commands/`):
+Slash commands that orchestrate the multi-agent pipeline (`commands/`):
 
 | Command | Description |
 |---------|-------------|
-| [dev](.claude/commands/dev.md) | Development pipeline — plan, build, review, verify, evidence, finalize |
-| [qa](.claude/commands/qa.md) | QA pipeline — plan, full QA, finalize |
-| [epic](.claude/commands/epic.md) | Epic pipeline — sub-issue dispatch + QA + final PR |
-| [fix](.claude/commands/fix.md) | Lightweight fix track — issue intake, fix branch, draft PR |
-| [plan-dev](.claude/commands/plan-dev.md) | Standalone dev plan posted as an issue comment (break-point) |
-| [plan-qa](.claude/commands/plan-qa.md) | Standalone QA plan posted as an issue comment (break-point) |
-| [ralph](.claude/commands/ralph.md) | Retry loop primitive — execute/verify/fix/repeat with capped termination |
-| [swarm](.claude/commands/swarm.md) | Parallel execution with model routing |
+| [dev](commands/dev.md) | Development pipeline — plan, build, review, verify, evidence, finalize |
+| [qa](commands/qa.md) | QA pipeline — plan, full QA, finalize |
+| [epic](commands/epic.md) | Epic pipeline — sub-issue dispatch + QA + final PR |
+| [fix](commands/fix.md) | Lightweight fix track — issue intake, fix branch, draft PR |
+| [plan-dev](commands/plan-dev.md) | Standalone dev plan posted as an issue comment (break-point) |
+| [plan-qa](commands/plan-qa.md) | Standalone QA plan posted as an issue comment (break-point) |
+| [ralph](commands/ralph.md) | Retry loop primitive — execute/verify/fix/repeat with capped termination |
+| [swarm](commands/swarm.md) | Parallel execution with model routing |
 
 ## Agents
 

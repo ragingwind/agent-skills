@@ -27,7 +27,7 @@ symlinks to it.
 | Path | Contents |
 |------|----------|
 | `skills/<name>/SKILL.md` | 26 skills — orchestration, browser/E2E verification, web, language experts, utilities |
-| `.claude/commands/*.md` | 8 pipeline slash commands — dev, qa, epic, fix, plan-dev, plan-qa, ralph, swarm |
+| `commands/*.md` | 8 pipeline slash commands — dev, qa, epic, fix, plan-dev, plan-qa, ralph, swarm |
 | `agents/*.md` | 4 personas — builder, reviewer, tester, debugger |
 | `rules/*.md` | 7 orchestration rules referenced by commands/agents/skills |
 | `scripts/`, `hooks/gate-keeping/` | Pipeline dependencies — events, evidence, and gate hooks |
