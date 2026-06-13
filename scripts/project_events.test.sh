@@ -8,15 +8,21 @@ GREEN='\033[32m'; RED='\033[31m'; RESET='\033[0m'
 ok()  { printf "  ${GREEN}ok${RESET} %s\n" "$1"; PASS=$((PASS+1)); }
 bad() { printf "  ${RED}FAIL${RESET} %s\n" "$1"; FAIL=$((FAIL+1)); }
 
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd -P)
+
 SBX=$(mktemp -d)
 trap "rm -rf '$SBX'" EXIT
 
-# Shared setup
+# Shared setup — copy the scripts-under-test from this repo, not the author's home
 FAKE_HOME="$SBX/home"
 mkdir -p "$FAKE_HOME/.claude/scripts"
-cp /Users/hkmoon/.claude/scripts/events.sh        "$FAKE_HOME/.claude/scripts/events.sh"
-cp /Users/hkmoon/.claude/scripts/project_events.sh "$FAKE_HOME/.claude/scripts/project_events.sh"
+cp "$SCRIPT_DIR/events.sh"         "$FAKE_HOME/.claude/scripts/events.sh"
+cp "$SCRIPT_DIR/project_events.sh" "$FAKE_HOME/.claude/scripts/project_events.sh"
 chmod +x "$FAKE_HOME/.claude/scripts/"*.sh
+
+# project_events.sh resolves events.sh via ${CLAUDE_PLUGIN_ROOT}/scripts/; point it
+# at the sandbox copy so the test exercises the same path the plugin uses.
+export CLAUDE_PLUGIN_ROOT="$FAKE_HOME/.claude"
 
 # A fake gh that captures arguments and returns a synthetic URL
 BIN_DIR="$SBX/bin"

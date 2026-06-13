@@ -52,10 +52,10 @@ See [README.md](README.md) for the full skill/command/agent catalog with descrip
 ## SKILL.md Format
 
 Each skill must have a `SKILL.md` with:
-- Frontmatter (name, description, version)
-- Purpose section
-- Instructions section
-- Examples section (optional)
+- Frontmatter — `name` and `description` (the `description` doubles as the
+  skill's trigger, so keep it specific)
+- A markdown body describing how the skill works — sections are freeform
+  (commonly Usage, Rules, Process, Input, Output)
 
 ## Script Requirements
 

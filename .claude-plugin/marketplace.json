@@ -13,7 +13,7 @@
         "source": "github",
         "repo": "ragingwind/agent-skills"
       },
-      "description": "Multi-agent orchestration skills — autopilot, routing, swarm, critics, ralph, and more."
+      "description": "Multi-agent orchestration — dev/qa/epic/fix pipelines, swarm parallelism, ralph retry loops, and builder/reviewer/tester/debugger agents."
     }
   ]
 }
