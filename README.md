@@ -14,7 +14,7 @@ npx skills add ragingwind/agent-skills
 
 ```bash
 /plugin marketplace add ragingwind/agent-skills
-/plugin install ragingwind-agent-skills@ragingwind-agent-skills
+/plugin install rw@ragingwind-agent-skills
 ```
 
 ## Pipelines

@@ -1,12 +1,14 @@
 {
   "name": "ragingwind-agent-skills",
-  "owner": { "name": "ragingwind" },
+  "owner": {
+    "name": "ragingwind"
+  },
   "metadata": {
     "description": "Multi-agent orchestration skills for AI coding agents — autonomous pipelines, parallel execution, and self-healing loops."
   },
   "plugins": [
     {
-      "name": "ragingwind-agent-skills",
+      "name": "rw",
       "source": {
         "source": "github",
         "repo": "ragingwind/agent-skills"
