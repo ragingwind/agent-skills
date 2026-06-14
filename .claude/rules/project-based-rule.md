@@ -9,7 +9,7 @@ Rule for the root soul documents (`CLAUDE.md`, `AGENTS.md`).
 
 ### Current state
 
-**Split done.** The repo now carries a real skill catalog (26 skills) plus slash
+**Split done.** The repo now carries a real skill catalog (25 skills) plus slash
 commands and personas, so `CLAUDE.md` and `AGENTS.md` are two purpose-built files
 — `AGENTS.md` is no longer a symlink. Edit each in its own role:
 

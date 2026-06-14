@@ -94,7 +94,6 @@ Each skill lives in `skills/<skill-name>/SKILL.md`.
 | Skill | Description |
 |-------|-------------|
 | [vscode](skills/vscode/) | Open VS Code at the current working directory |
-| [ghostty-split](skills/ghostty-split/) | Ghostty terminal split helper |
 | [browse-terminal](skills/browse-terminal/) | Open web pages inside the Ghostty terminal |
 | [geeknews](skills/geeknews/) | Generate GeekNews-style Korean tech summaries |
 

@@ -77,7 +77,6 @@ When the user's intent matches a row, read that `SKILL.md` and follow it.
 | Intent | Skill |
 |--------|-------|
 | Open VS Code at the working directory | `vscode` |
-| Open a Ghostty split pane | `ghostty-split` |
 | GeekNews-style Korean tech summary of a project | `geeknews` |
 
 ## Slash commands & pipeline lifecycle

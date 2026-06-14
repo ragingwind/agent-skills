@@ -23,7 +23,7 @@ a symlink target indirectly — edit the canonical file.
 
 | Path | Contents |
 |------|----------|
-| `skills/<name>/SKILL.md` | 26 skills — orchestration/quality, browser/E2E, web/frontend, language experts, utilities |
+| `skills/<name>/SKILL.md` | 25 skills — orchestration/quality, browser/E2E, web/frontend, language experts, utilities |
 | `commands/*.md` | 8 pipeline slash commands — dev, qa, epic, fix, plan-dev, plan-qa, ralph, swarm |
 | `agents/*.md` | 4 personas — builder, reviewer, tester, debugger |
 | `rules/*.md` | 7 orchestration rules referenced by commands/agents/skills |
