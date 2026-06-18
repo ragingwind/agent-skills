@@ -1,10 +1,10 @@
 # ragingwind/agent-skills
 
-Multi-agent orchestration skills for AI coding agents — autonomous pipelines, parallel execution, and self-healing loops.
+A library of reusable skills for AI coding agents.
 
 ## Repository Overview
 
-This repository contains reusable skills, agent personas, and slash commands for AI coding agents. It is designed as a shared skill library installable via the Claude Code marketplace and usable by any AGENTS.md-aware coding agent.
+This repository contains reusable skills for AI coding agents. It is designed as a shared skill library installable via the Claude Code marketplace and usable by any AGENTS.md-aware coding agent.
 
 ## Supported Coding Agents
 
@@ -28,6 +28,7 @@ Each skill lives in `skills/<skill-name>/SKILL.md`.
 
 | Skill | Description |
 |-------|-------------|
+| anatomy-project | Analyzes the current project and produces an onboarding guide (architecture, key modules, structure, features, trade-offs) in the user's language, aimed at helping juniors understand the codebase. Invoke as `/anatomy-project [path]`. |
 | reviewloop | Moved to standalone repo: [ragingwind/reviewloop](https://github.com/ragingwind/reviewloop) |
 
 ## Conventions
@@ -44,11 +45,14 @@ Each skill lives in `skills/<skill-name>/SKILL.md`.
 
 ## SKILL.md Format
 
-Each skill must have a `SKILL.md` with:
-- Frontmatter (name, description, version)
-- Purpose section
-- Instructions section
-- Examples section (optional)
+Each skill has a `SKILL.md` with:
+- YAML frontmatter: `name` and `description` are required. For a user-invocable
+  skill, add `user-invocable: true` and an `argument-hint`.
+- A short purpose line describing what the skill does.
+- Instructions the agent follows (inputs, steps, expected output).
+- An examples section (optional).
+
+Run `bash scripts/validate-skills.sh` to check that a skill meets these requirements.
 
 ## Script Requirements
 
