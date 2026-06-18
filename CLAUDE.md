@@ -28,6 +28,7 @@ Each skill lives in `skills/<skill-name>/SKILL.md`.
 
 | Skill | Description |
 |-------|-------------|
+| anatomy-project | Analyzes the current project and produces an onboarding guide (architecture, key modules, structure, features, trade-offs) in the user's language, aimed at helping juniors understand the codebase. Invoke as `/anatomy-project [path]`. |
 | reviewloop | Moved to standalone repo: [ragingwind/reviewloop](https://github.com/ragingwind/reviewloop) |
 
 ## Conventions
