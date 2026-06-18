@@ -4,3 +4,4 @@ node_modules/
 .claude/sessions/
 .claude/cache/
 .claude/worktrees/
+.claude/settings.local.json

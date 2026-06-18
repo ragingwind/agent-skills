@@ -1,0 +1,13 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate SKILL.md files
+        run: bash scripts/validate-skills.sh
