@@ -2,7 +2,7 @@
   "name": "ragingwind-agent-skills",
   "owner": { "name": "ragingwind" },
   "metadata": {
-    "description": "Multi-agent orchestration skills for AI coding agents — autonomous pipelines, parallel execution, and self-healing loops."
+    "description": "A library of reusable skills for AI coding agents."
   },
   "plugins": [
     {
@@ -11,7 +11,7 @@
         "source": "github",
         "repo": "ragingwind/agent-skills"
       },
-      "description": "Multi-agent orchestration skills — autopilot, routing, swarm, critics, ralph, and more."
+      "description": "Reusable skills for AI coding agents. Includes anatomy-project, which generates project onboarding guides."
     }
   ]
 }

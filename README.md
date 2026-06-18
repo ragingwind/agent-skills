@@ -1,6 +1,6 @@
 # ragingwind/agent-skills
 
-Multi-agent orchestration skills for AI coding agents — autonomous pipelines, parallel execution, and self-healing loops.
+A library of reusable skills for AI coding agents.
 
 ## Installation
 
@@ -21,7 +21,8 @@ npx skills add ragingwind/agent-skills
 
 | Skill | Description |
 |-------|-------------|
-| [reviewloop](skills/reviewloop/) | Bidirectional implement/review loop via GitHub PR comments |
+| [anatomy-project](skills/anatomy-project/) | Analyzes the current project and produces an onboarding guide (architecture, key modules, structure, features, trade-offs) in the user's language. Invoke as `/anatomy-project [path]`. |
+| reviewloop | Moved to a standalone repo: [ragingwind/reviewloop](https://github.com/ragingwind/reviewloop) |
 
 ## Usage
 
