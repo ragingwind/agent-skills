@@ -372,7 +372,7 @@ value.
 | --- | --- | --- |
 | started | the first wait after launch returns idle | Records the row, sends the brief |
 | stage | a new stage line in the status file | Updates the row's stage and step. For an `end` line, first check its evidence ("Evidence at every step") |
-| report | `status.py read` shows the task `stopped`, or a wait returns idle and the last lines hold `REPORT:` | The stop line's `done` holds the report. `ready`: check finalize's evidence, then the verification session. `waiting`: `plan-check` ("Evidence at every step"), or what you told the lead to wait for ("Coordinate"). `decision`: add it to "Waiting on the person". `blocked`: fix what it needs or ask the person. A cut report is read from the transcript |
+| report | `status.py read` shows the task `stopped`, or a wait returns idle and the last lines hold `REPORT:` | The stop line's `done` holds the report. `ready`: check finalize's evidence, then the verification session. `waiting`: `plan-check` ("Evidence at every step"), or what you told the lead to wait for ("Coordinate"). `decision`: gather it with the other pending decisions and ask the person ("Ask the person"). `blocked`: fix what it needs or ask the person. A cut report is read from the transcript |
 | question | the agent asks inside the task's scope | Answer with the recommended option; only a choice that changes behavior, an interface, a schema or a core module goes to the person |
 | blocked | a dialog on screen | A permission prompt goes to the person with the agent and the command; never answer it. A trust question: the adapter page. A question dialog is closed only when the person already answered it |
 | stalled | `status.py read` marks the task `stalled` | Read the screen; move it on when it waits for a yes the brief already gave; otherwise ask what blocks it |
@@ -587,6 +587,12 @@ the person asks, run one.
   `report.template` and nothing else. Headings, column names and stage
   names stay English; free text is in `report.language`. Address the person
   as `report.address` says, or not at all when it is empty.
+- **Links**: every link starts with a label in `report.language`, then
+  ` - ` and the full URL. The label names the person's action only when the
+  person has one to take (merge request, review request, decision request);
+  otherwise it names the state alone (in progress, in verification, draft,
+  merged, failed), never a verb that reads as a request. The links hold
+  every pull request in the table and every URL a For you item needs.
 - The open pull requests come sorted by risk, one line of reason each:
   - **safe to merge**: the gate passes and the difficulty is low or mid;
   - **needs a real review**: high difficulty, or the gate passes with
@@ -595,6 +601,25 @@ the person asks, run one.
     changes, or a decision is pending;
   - **close**: replaced by another pull request or no longer needed.
 - Other answers: short, result first, by pull request number.
+
+## Ask the person
+
+Every decision that is the person's goes to the person with the
+AskUserQuestion tool. A review request or a question on GitHub is the record
+of a decision, never the way to ask for it.
+
+1. **Gather**: collect the pending decisions from the tasks' `REPORT:
+   decision` lines and the issues they name: an ADR's review points, a
+   value a spec leaves open, an approval, a choice between fixes. Read each
+   issue or comment yourself; never ask the person to go and read it.
+2. **Write**: one question per decision, up to four per call. Each question
+   stands on its own: what is decided, for which issue, and the facts the
+   choice rests on. The recommended option comes first, marked
+   "(Recommended)", with its reason; every option names its cost.
+3. **Before asking**: handle every waiting event and start every waiter,
+   because an open question holds the checks until the person answers.
+4. **Relay**: send each answer to its lead in the person's own words and
+   scope, and log it. The lead records it on the issue.
 
 ## Change a setting
 

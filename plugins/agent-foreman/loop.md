@@ -158,7 +158,11 @@ Stop only at these, and report:
    caller sees, an interface, a schema or file format, or a core module, and
    that the task does not settle. Write the question with your recommended
    option and its reason, keep working on everything that does not depend on
-   it, and stop when nothing else is left.
+   it, and stop when nothing else is left. Put each decision in your
+   `REPORT: decision` (or a file it names): what is decided, the options,
+   each option's cost, and your recommendation. The foreman asks the person
+   with a question dialog and relays the answer; a review request you post
+   on GitHub records the decision, but the person does not answer there.
 3. **Blocked**: something you cannot get or do, after trying once more.
 4. **Waiting for the foreman**: the next step is the foreman's (`plan-check`,
    at high difficulty). Write the stop line on that step (`--step
