@@ -19,7 +19,8 @@ and the check says what is wrong.
 - A tier is an ordered list of models. The first is used; on a usage limit
   or a provider error the next one is.
 - Each agent is its own process with its own model, so one task can mix
-  providers: a lead on a token-factory model, a red team on Anthropic opus.
+  providers and agent kinds: a lead on a token-factory model or on Codex, a
+  red team on Anthropic opus.
 
 ## 1. Make the file
 
@@ -34,8 +35,8 @@ the path and the file's problems.
 
 ## 2. The person edits it
 
-Show the path, the file as it is, and this example of a token factory added,
-then ask the person to edit the file and say when it is done. When the file
+Show the path, the file as it is, and this example of a token factory and
+Codex added, then ask the person to edit the file and say when it is done. When the file
 already passes the check and the person has nothing to add, go on.
 
 ```json
@@ -53,12 +54,17 @@ already passes the check and the person has nothing to add, go on.
       "models": [
         {"id": "zai-org/GLM-5.3-Flash", "name": "glm", "context": 200000}
       ]
+    },
+    {
+      "id": "openai",
+      "agent": "codex",
+      "models": [{"id": "gpt-5.5", "name": "gpt"}]
     }
   ],
   "tiers": {
     "low": ["glm", "haiku"],
     "mid": ["glm", "sonnet"],
-    "high": ["opus", "sonnet"]
+    "high": ["opus", "gpt", "sonnet"]
   }
 }
 ```
@@ -66,15 +72,16 @@ already passes the check and the person has nothing to add, go on.
 | Where | Key | Needed | Meaning |
 | --- | --- | --- | --- |
 | provider | `id` | yes | The provider's name |
-| | `base_url` | | None: Anthropic, Claude Code's own login. Set: an anthropic-compatible endpoint |
+| | `agent` | | The agent kind its models run: `claude` (default) or `codex` |
+| | `base_url` | | None: the agent's own login, Claude Code's (Anthropic) or Codex's. Set: an anthropic-compatible endpoint, for `claude` only |
 | | `auth` | with `base_url` | `bearer` or `x-api-key` |
 | | `token_env` | with `base_url` | The **name** of the environment variable that holds the key; never the key |
 | | `models` | yes | The models it serves |
-| model | `id` | yes | The model the provider knows; for Anthropic, what `claude --model` takes |
+| model | `id` | yes | The model the provider knows; for Anthropic, what `claude --model` takes; for Codex, what `codex --model` takes |
 | | `name` | when `id` has other characters than letters, digits, `.`, `_`, `-` | The name tiers use (default: `id`); unique across providers |
 | | `context` | with `base_url` | The context size in tokens |
 | | `roles` | | The models of the same provider a subagent's `opus`, `sonnet` and `haiku` map to (default: the model itself) |
-| | `agent` | | The agent kind (default: `claude`) |
+| | `agent` | | The agent kind, when it is not the provider's |
 | top | `tiers` | yes | `low`, `mid` and `high`, each a list of model names in order |
 
 Offer `fable`, or a model outside the harness's own, only when the person

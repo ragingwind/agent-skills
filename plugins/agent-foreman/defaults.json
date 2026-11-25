@@ -119,11 +119,7 @@
         "mode": "prompt",
         "step": 0,
         "prompt": "review",
-        "deny_tools": [
-          "Edit",
-          "Write",
-          "NotebookEdit"
-        ],
+        "no_edit": true,
         "accept": [
           "approved"
         ]
@@ -132,11 +128,7 @@
         "mode": "prompt",
         "step": 1,
         "prompt": "redteam",
-        "deny_tools": [
-          "Edit",
-          "Write",
-          "NotebookEdit"
-        ],
+        "no_edit": true,
         "accept": [
           "approved"
         ]
@@ -145,11 +137,7 @@
         "mode": "prompt",
         "step": 1,
         "prompt": "qa",
-        "deny_tools": [
-          "Edit",
-          "Write",
-          "NotebookEdit"
-        ],
+        "no_edit": true,
         "accept": [
           "pass"
         ]

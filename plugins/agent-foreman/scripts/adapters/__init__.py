@@ -3,17 +3,16 @@
 A profile names its agent kind in `agent` (default `claude`). Each kind is a
 module that defines the names in `base.REQUIRED`, plus a page in
 `<skill>/adapters/<kind>.md` on how to read, answer and exit that agent's
-screen. Only `claude` exists today; another kind is one more module listed
-in ADAPTERS and one more page.
+screen. Another kind is one more module listed in ADAPTERS and one more page.
 """
-from . import claude
-from .base import REQUIRED, NoTranscript, TokenMissing
+from . import claude, codex
+from .base import PLUGIN, REQUIRED, NoTranscript, TokenMissing
 
-ADAPTERS = {claude.KIND: claude}
+ADAPTERS = {claude.KIND: claude, codex.KIND: codex}
 KINDS = list(ADAPTERS)
 DEFAULT = claude.KIND
 
-__all__ = ["ADAPTERS", "KINDS", "DEFAULT", "REQUIRED", "NoTranscript", "TokenMissing", "get", "kind_of"]
+__all__ = ["ADAPTERS", "KINDS", "DEFAULT", "PLUGIN", "REQUIRED", "NoTranscript", "TokenMissing", "get", "kind_of"]
 
 
 def get(kind):

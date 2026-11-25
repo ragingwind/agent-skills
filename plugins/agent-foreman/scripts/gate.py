@@ -64,7 +64,8 @@ Checks (each may say "severity": "warn" to report without blocking):
                   pull request holds it whole, as `loop.py post` writes it
   tests-weakened  no removed test file, added skip marker, edited CI file,
                   changed coverage threshold or edited agent instructions
-                  (`.claude/`, `CLAUDE.md`, `AGENTS.md`), except the kinds in
+                  (`.claude/`, `CLAUDE.md`, `.agents/`, `.codex/`,
+                  `AGENTS.md`), except the kinds in
                   "allow" (removed-test, skip-marker, ci-edit, coverage,
                   agent-files)
   size            additions + deletions at most "max_lines"
@@ -111,7 +112,8 @@ TEST_PATHS = ["**/tests/**", "**/test/**", "**/__tests__/**", "**/*_test.*", "**
               "**/*.spec.*", "**/spec/**"]
 CI_PATHS = ["**/.github/workflows/**", "**/.gitlab-ci.yml", "**/Jenkinsfile", "**/.circleci/**",
             "**/azure-pipelines.yml"]
-AGENT_PATHS = ["**/.claude/**", "**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md"]
+AGENT_PATHS = ["**/.claude/**", "**/CLAUDE.md", "**/CLAUDE.local.md", "**/.agents/**", "**/.codex/**",
+               "**/AGENTS.md"]
 SKIP_MARKERS = re.compile(r"@pytest\.mark\.(skip|xfail)|\b(it|test|describe)\.skip\(|\bx(it|describe)\(|"
                           r"\bt\.Skip(Now|f)?\(|@Ignore\b|@Disabled\b|#\[ignore\]|unittest\.skip|\.only\(")
 COVERAGE = re.compile(r"fail_under|fail-under|cov-fail-under|coverageThreshold|min(imum)?_coverage", re.I)

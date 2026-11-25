@@ -4,7 +4,8 @@ in fixture/repo, against a local stand-in for GitHub (fixture/bin/gh), and
 report whether every step left its evidence.
 
 Usage:
-  python3 fixture/run.py [--task 1|2|all] [--dir DIR] [--rounds N] [--scenario NAME,...] [--dry-run]
+  python3 fixture/run.py [--task 1|2|all] [--dir DIR] [--rounds N] [--scenario NAME,...] [--providers FILE]
+                         [--dry-run]
 
 This script plays the foreman's scripted part, as SKILL.md has it: the task
 folder, loop.json, the gate and its hash, the brief, the lead's clone, the
@@ -20,6 +21,9 @@ with no model call.
 
 Settings, the ledger, the log and the bundle live in DIR (default: a new
 folder under the system's temporary folder), never in the person's own.
+--providers FILE gives the run a providers.json (setup/models.md), such as
+one whose mid tier starts with a Codex model; by default the run has the
+standard models.
 The task folders and clones go where the scripts always put them
 (~/.local/state/agent-foreman/tasks/fixture-repo,
 ~/.cache/agent-foreman/work/fixture-repo) and are removed at the end.
@@ -81,8 +85,8 @@ def say(text):
 
 
 class Run:
-    def __init__(self, root, dry_run, scenarios=()):
-        self.root, self.dry_run, self.scenarios = root, dry_run, set(scenarios)
+    def __init__(self, root, dry_run, scenarios=(), providers=None):
+        self.root, self.dry_run, self.scenarios, self.providers = root, dry_run, set(scenarios), providers
         self.env = dict(os.environ)
         self.env.update(XDG_CONFIG_HOME=os.path.join(root, "config"), XDG_STATE_HOME=os.path.join(root, "state"),
                         XDG_CACHE_HOME=os.path.join(root, "cache"), FAKE_GH_STATE=os.path.join(root, "gh.json"),
@@ -144,10 +148,11 @@ class Run:
         with open(os.path.join(project, "project.json"), "w") as f:
             json.dump({"repo": REPO, "workspace": "repo", "machines": {"local": self.checkout},
                        "tests": {"full": "make test"}, "post_answers": True}, f)
-        if "no-verdict" in self.scenarios:  # the standard tiers give QA one profile; the rule needs a next one
-            with open(os.path.join(PLUGIN, "providers.json.sample")) as f:
+        if self.providers or "no-verdict" in self.scenarios:
+            with open(self.providers or os.path.join(PLUGIN, "providers.json.sample")) as f:
                 models = json.load(f)
-            models["tiers"]["high"] = models["tiers"]["high"] + ["haiku"]
+            if "no-verdict" in self.scenarios:  # the standard tiers give QA one profile; the rule needs a next one
+                models["tiers"]["high"] = models["tiers"]["high"] + ["haiku"]
             os.makedirs(os.path.join(self.env["XDG_CONFIG_HOME"], "agent-foreman"), exist_ok=True)
             with open(os.path.join(self.env["XDG_CONFIG_HOME"], "agent-foreman", "providers.json"), "w") as f:
                 json.dump(models, f, indent=2)
@@ -745,6 +750,7 @@ def main(argv):
     ap.add_argument("--rounds", type=int, default=2, help="verification rounds before it gives up (default 2)")
     ap.add_argument("--scenario", action="append", default=[], metavar="NAME,...",
                     help=f"force a path: {', '.join(SCENARIOS)}, or all")
+    ap.add_argument("--providers", metavar="FILE", help="the run's providers.json (default: the standard models)")
     ap.add_argument("--dry-run", action="store_true", help="prepare everything; call no model")
     args = ap.parse_args(argv)
     scenarios = {n.strip() for v in args.scenario for n in v.split(",") if n.strip()}
@@ -759,7 +765,9 @@ def main(argv):
     if os.path.exists(root) and os.listdir(root):
         raise SystemExit(f"run.py: {root} is not empty")
     os.makedirs(root, exist_ok=True)
-    run = Run(root, args.dry_run, scenarios)
+    if args.providers and not os.path.isfile(args.providers):
+        ap.error(f"no providers file at {args.providers}")
+    run = Run(root, args.dry_run, scenarios, os.path.abspath(args.providers) if args.providers else None)
     run.setup()
     try:
         for task in (TASKS if args.task == "all" else [args.task]):

@@ -247,6 +247,27 @@ class Providers(unittest.TestCase):
         self.assertEqual(config.token_names(cfg), ["TF_API_TOKEN"])
         self.assertEqual(config.role_candidates(cfg, "mid", "pair", lead="glm"), ["sonnet", "opus"])
 
+    def test_a_codex_provider(self):
+        self.write(providers({"id": "openai", "agent": "codex", "models": [{"id": "gpt-5.5", "name": "gpt"},
+                                                                            {"id": "gpt-5.5-mini"}]},
+                             tiers={"low": ["haiku"], "mid": ["gpt", "sonnet"], "high": ["opus", "gpt"]}))
+        cfg = config.load()
+        self.assertEqual(cfg["gateways"]["openai"], {"kind": "openai"})
+        self.assertEqual(cfg["profiles"]["gpt"], {"gateway": "openai", "model": "gpt-5.5", "agent": "codex"})
+        self.assertEqual(cfg["profiles"]["gpt-5.5-mini"]["agent"], "codex")
+        self.assertEqual(cfg["profiles"]["opus"], {"gateway": "anthropic", "model": "opus"})
+        self.assertEqual(config.validate(cfg), [])
+        self.assertEqual(config.role_candidates(cfg, "mid", "pair", lead="gpt"), ["sonnet", "opus"])
+        bad = providers({"id": "openai", "agent": "codex", "base_url": "https://x.example", "auth": "bearer",
+                         "token_env": "K", "models": [{"id": "g", "context": 9}]},
+                        {"id": "other", "agent": "nope", "models": [{"id": "n"}]})
+        p = config.providers_problems(bad)
+        for want in ("provider openai: codex runs only on its own login", "provider other: agent must be one of"):
+            self.assertTrue(any(want in x for x in p), (want, p))
+        self.write(providers(opus={"agent": "codex"}))
+        self.assertIn("profile opus: codex cannot run on gateway anthropic (kind anthropic); it runs on openai",
+                      config.validate(config.load()))
+
     def test_problems_in_the_file_s_own_terms(self):
         bad = providers({"id": "tf", "base_url": "ftp://x", "auth": "basic", "token_env": "sk-123 secret",
                          "models": [{"id": "zai-org/GLM"}, {"id": "m", "roles": {"opus": "ghost", "huge": "m"}},

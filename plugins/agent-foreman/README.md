@@ -108,6 +108,7 @@ it from writing a fake answer file into `reviews/`.
 | --- | --- |
 | herdr on this machine and on every machine that runs agents, each remote saved with `herdr machine add` (tested with 0.9.5) | The foreman drives tabs and agents through `herdr --machine` |
 | Claude Code, signed in, on every machine that runs agents (tested with 2.1.323) | The agents are Claude Code sessions |
+| Codex CLI, signed in, where a profile runs Codex (optional; tested with 0.172.0) | A model of a provider with `"agent": "codex"` runs as a Codex session |
 | `claude`, `git`, `gh` (signed in) and `python3` on `PATH` in each machine's login shell | Agents start there and open pull requests; the scripts need only Python's standard library |
 | SSH from this machine to each remote with no password prompt | Bundles and task folders travel over `ssh` and `scp` |
 | A checkout of the repository on each machine | Agent clones are made from it |
@@ -127,7 +128,7 @@ it from writing a fake answer file into `reviews/`.
    running it again changes only what you pick:
    - **Models**: it copies `providers.json.sample` to
      `~/.config/agent-foreman/providers.json`, with Claude's own models
-     (`haiku`, `sonnet`, and `opus` then `sonnet`), and asks you to edit it: add a provider such as a token factory, and the
+     (`haiku`, `sonnet`, and `opus` then `sonnet`), and asks you to edit it: add a provider such as a token factory or Codex, and the
      models each difficulty uses. Each difficulty needs a model other than
      its lead's for the agents that check the work.
    - **Project**: the repository, the machines and their checkout paths, and

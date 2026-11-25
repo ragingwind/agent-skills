@@ -2,20 +2,22 @@
 """Build a project's skill bundle and put it on a herdr machine once.
 
 A bundle holds agent-foreman's default skills (kit/skills), the project's
-other skills (each skill directory whole, with its scripts), in the layout the
-agent kind loads (its adapter's bundle_layout; for claude, a plugin named
-foreman-kit), the lead's guide, launch.py with the
-project's launch settings and the adapters, and transcript.py. A skill of a
-plugin in the settings' plugin_dirs goes with its plugin: the bundle carries
-that plugin's whole directory under `plugins/<name>/`, and launch.py loads it
-with its own --plugin-dir, so its agents, scripts and hooks come along and no
-machine needs the plugin installed. `bundle.json`
-names the agent kind. Its name is a hash of its content: a machine that
-already holds it is not sent it again, and any change makes a new one.
+other skills (each skill directory whole, with its scripts), in the layout
+each agent kind loads (its adapter's bundle_layout: a Claude Code plugin named
+foreman-kit at the bundle's root, which codex reads too), the lead's guide,
+launch.py with the project's launch settings and the adapters, and
+transcript.py. One bundle serves every kind, so a task's agents may run
+different kinds; `bundle.json` lists them. A skill of a plugin in the
+settings' plugin_dirs goes with its plugin: the bundle carries that plugin's
+whole directory under `plugins/<name>/`, and launch.py loads it with its own
+--plugin-dir, so its agents, scripts and hooks come along and no machine needs
+the plugin installed (codex reads only its skills). Its
+name is a hash of its content: a machine that already holds it is not sent it
+again, and any change makes a new one.
 
 Usage:
-  bundle.py build --project OWNER/REPO [--skills REF,...] [--agent KIND]
-  bundle.py push MACHINE --project OWNER/REPO [--skills REF,...] [--agent KIND]
+  bundle.py build --project OWNER/REPO [--skills REF,...]
+  bundle.py push MACHINE --project OWNER/REPO [--skills REF,...]
 
 MACHINE is a herdr machine label, or `local`. --skills adds skills for one
 task to the project's own. Prints one JSON object.
@@ -47,8 +49,8 @@ SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv"}
 SKIP_FILES = {".DS_Store"}
 SSH = ["ssh", "-o", "BatchMode=yes"]
 # The scripts an agent runs, and every module they import (config imports loop).
-BUNDLED = ("config.py", "loop.py", "launch.py", "transcript.py", "score.py", "gate.py", "status.py", "heartbeat.py", "clone.py",
-           "fulltest.py")
+BUNDLED = ("config.py", "loop.py", "launch.py", "transcript.py", "score.py", "gate.py", "status.py", "heartbeat.py",
+           "hook.py", "clone.py", "fulltest.py")
 
 
 def fail(code, message):
@@ -73,16 +75,15 @@ def _tree(src):
     return out
 
 
-def contents(cfg, skill_dirs, kind=adapters.DEFAULT, plugins=None):
+def contents(cfg, skill_dirs, plugins=None):
     """Every file of the bundle: relative path -> bytes. `plugins` (name ->
     directory) are carried whole under plugins/<name>/ and named in
     config.json's `plugins`."""
-    adapter = adapters.get(kind)
     plugins = plugins or {}
     settings = {k: cfg[k] for k in ("gateways", "profiles", "launch", "difficulty")}
     settings["plugins"] = sorted(plugins)
     files = {
-        "bundle.json": json.dumps({"agent": kind}).encode() + b"\n",
+        "bundle.json": json.dumps({"agents": adapters.KINDS}).encode() + b"\n",
         "config.json": json.dumps(settings, indent=2, sort_keys=True).encode() + b"\n",
         "loop.md": _read(os.path.join(SKILL_DIR, "loop.md")),
     }
@@ -90,7 +91,9 @@ def contents(cfg, skill_dirs, kind=adapters.DEFAULT, plugins=None):
         files[f"scripts/{name}"] = _read(os.path.join(HERE, name))
     for rel, data in _tree(os.path.join(HERE, "adapters")).items():
         files[f"scripts/adapters/{rel}"] = data
-    files.update(adapter.bundle_layout({ref.split(":")[-1]: _tree(src) for ref, src in skill_dirs.items()}))
+    skills = {ref.split(":")[-1]: _tree(src) for ref, src in skill_dirs.items()}
+    for adapter in adapters.ADAPTERS.values():
+        files.update(adapter.bundle_layout(skills))
     for name, src in sorted(plugins.items()):
         for rel, data in _tree(src).items():
             files[f"plugins/{name}/{rel}"] = data
@@ -166,7 +169,7 @@ def push_remote(target, bundle_hash, files):
     return path, "uploaded"
 
 
-def build(repo, extra, kind=adapters.DEFAULT, project_names=()):
+def build(repo, extra, project_names=()):
     """The bundle for a project: (hash, files, skills it carries, warnings).
 
     Every default skill is bundled. Every other skill the project's loops
@@ -206,7 +209,7 @@ def build(repo, extra, kind=adapters.DEFAULT, project_names=()):
         if source == "plugin" and value not in plugin_refs:
             plugin_refs.append(value)
             plugin = value.split(":")[0]
-            if plugin == adapters.get(kind).PLUGIN:
+            if plugin == adapters.PLUGIN:
                 fail(EXIT_SETUP_NEEDED, f"plugin {plugin} has the name of the bundle's own plugin; it cannot go along")
             carried[plugin] = os.path.expanduser(whole[plugin])
         elif source == "bundle" and value not in refs:
@@ -220,9 +223,9 @@ def build(repo, extra, kind=adapters.DEFAULT, project_names=()):
     shorts = [r.split(":")[-1] for r in refs] + list(kit)
     if len(set(shorts)) != len(shorts):
         fail(EXIT_SETUP_NEEDED, f"two skills share one name in the bundle: {', '.join(refs + list(kit))}")
-    files = contents(cfg, {**{r: available[r] for r in refs}, **kit}, kind, carried)
-    return (digest(files), files, [adapters.get(kind).skill_name(r) for r in refs + list(kit)] + plugin_refs,
-            warnings)
+    files = contents(cfg, {**{r: available[r] for r in refs}, **kit}, carried)
+    call = adapters.get(adapters.DEFAULT).skill_name
+    return digest(files), files, [call(r) for r in refs + list(kit)] + plugin_refs, warnings
 
 
 def main(argv):
@@ -231,7 +234,6 @@ def main(argv):
     ap.add_argument("machine", nargs="?")
     ap.add_argument("--project", required=True, metavar="OWNER/REPO")
     ap.add_argument("--skills", default="", metavar="REF,...")
-    ap.add_argument("--agent", default=adapters.DEFAULT, choices=adapters.KINDS)
     args = ap.parse_args(argv)
     if not REPO.match(args.project):
         fail(2, f"--project must look like owner/name, not {args.project!r}")
@@ -247,8 +249,8 @@ def main(argv):
             project_names = loops.project_skill_names(machine, hosts[machine])
         except (ValueError, RuntimeError) as e:
             fail(1, f"cannot list the project's skills on {machine}: {e}")
-    bundle_hash, files, skills, warnings = build(args.project, extra, args.agent, project_names)
-    out = {"hash": bundle_hash, "agent": args.agent, "skills": skills, "project_skills": project_names,
+    bundle_hash, files, skills, warnings = build(args.project, extra, project_names)
+    out = {"hash": bundle_hash, "agents": adapters.KINDS, "skills": skills, "project_skills": project_names,
            "missing": warnings}
     for w in warnings:
         print(f"bundle.py: missing skill: {w}", file=sys.stderr)

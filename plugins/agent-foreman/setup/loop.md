@@ -194,8 +194,9 @@ Go into the chosen parts only.
   order of existing steps stays.
 - **Difficulty**: per step, `run` at low, mid and high (`always`, `never`,
   `if-not-trivial`). A stage whose steps all do not run is skipped.
-- **Roles**: `mode` (`prompt` or `pane`), `step` (tiers above the lead's), and
-  the fixed prompt. `loop.py prompt` fills in `<task>`, `<repo>`, `<base>`,
+- **Roles**: `mode` (`prompt` or `pane`), `step` (tiers above the lead's),
+  `no_edit` (`true`: the agent edits no file, whatever its kind), and the
+  fixed prompt. `loop.py prompt` fills in `<task>`, `<repo>`, `<base>`,
   `<head>`, `<diff>`, `<task folder>`, `<skill>`, `<skills>`, `<full test
   command>` and `<trivial>`; write no other `<...>` in a prompt. A judging
   prompt must keep its `Verdict:` line, and each verdict word must be an

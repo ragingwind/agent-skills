@@ -105,7 +105,9 @@ are first-class; tmux and ghostty come later behind the same interface.
 | close | exit, `tab close` | nothing to close |
 
 **Agent adapter.** What differs per agent kind (command, skill delivery,
-transcript, checkout readiness, screen rules). Only `claude` exists.
+transcript, checkout readiness, screen rules). Two kinds exist: `claude`
+(Claude Code) and `codex` (Codex CLI). One bundle serves both, so a task's
+agents may run different kinds, and a skill has the same name in both.
 
 ## 3. Settings
 
@@ -121,9 +123,9 @@ standard values.
 
 ## 4. Models
 
-- **Providers.** `providers.json` lists each provider (Anthropic, or an
-  anthropic-compatible endpoint with its URL, auth and token variable name)
-  and its models. A model's `name` (default: its `id`) is its **profile**:
+- **Providers.** `providers.json` lists each provider (Anthropic, Codex's
+  own login with `"agent": "codex"`, or an anthropic-compatible endpoint
+  with its URL, auth and token variable name) and its models. A model's `name` (default: its `id`) is its **profile**:
   the name tiers, `loop.json` and `launch.py` use. Scripts turn the file
   into the gateways and profiles they run on (`config.py`).
 - **Tiers.** `high`, `mid`, `low` (상·중·하), in the same file. Each tier is an
@@ -313,8 +315,9 @@ runs the same steps; only a trivial task skips the pair's steps.
 
 None of them runs on the lead's profile (section 4).
 
-- Role agents start without edit tools (the role's `deny_tools`: `Edit`,
-  `Write`, `NotebookEdit`). That narrows them; it is not a sandbox. Their own
+- Role agents start without edit tools (the role's `no_edit`: Claude
+  Code's `Edit`, `Write` and `NotebookEdit` are disallowed, and a hook
+  refuses Codex's `apply_patch`). That narrows them; it is not a sandbox. Their own
   clone, whose push to origin fails (`clone.py make --no-push`), and the
   gate's check that each verdict is at the head commit keep their writes from
   reaching the pull request. A role agent never starts other agents.
@@ -515,8 +518,8 @@ Pass conditions are code, not prose (`scripts/gate.py`).
   for the person, blocked, waiting (for the foreman's `plan-check`).
 - **Prompt-mode runs** of a role leave three files in `reviews/`:
   `<agent>-<n>.prompt.md` (from `loop.py prompt`), `<agent>-<n>.json` (the
-  JSON result: `result`, `session_id`, `total_cost_usd`,
-  `permission_denials`) and `<agent>-<n>.meta.json` (role, agent, profile,
+  JSON result, in Claude Code's names for every agent kind: `result`,
+  `session_id`, `total_cost_usd`, `permission_denials`) and `<agent>-<n>.meta.json` (role, agent, profile,
   model, the commit it ran at, verdict, start and end).
 
 ## 10. Isolation and trust

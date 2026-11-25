@@ -74,7 +74,7 @@ The new pane id is `.result.pane.pane_id`.
 
 ```bash
 H pane run <pane> 'python3 <bundle>/scripts/launch.py <profile> --name <name> --session-id <id> --task-dir <task folder>'
-python3 <skill>/scripts/clone.py trust <clone> --pane <pane> --machine <machine>
+python3 <skill>/scripts/clone.py trust <clone> --pane <pane> --machine <machine> --kind <kind>
 H agent rename <pane> <name>
 ```
 

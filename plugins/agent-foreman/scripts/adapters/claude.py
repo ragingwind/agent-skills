@@ -3,15 +3,16 @@ import glob
 import json
 import os
 
-from .base import NoTranscript, TokenMissing
+from .base import NEVER_MERGE, PLUGIN, NoTranscript, TokenMissing
 
 KIND = "claude"
 HERDR_KIND = "claude"
 EXECUTABLE = "claude"
-PLUGIN = "foreman-kit"
+GATEWAY_KINDS = ["anthropic", "anthropic-compatible"]
 ROLES = ["opus", "sonnet", "haiku"]
 HEARTBEAT = 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/heartbeat.py"'
-NEVER = ["Bash(gh pr merge:*)"]
+NEVER = [f"Bash({NEVER_MERGE}:*)"]
+EDIT_TOOLS = ["Edit", "Write", "NotebookEdit"]
 TRUST_SCREEN = "Accessing workspace"
 TRUST_KEYS = ["Down", "Enter"]
 
@@ -52,13 +53,13 @@ def gateway_env(gateway, profile, environ):
 
 
 def command(cfg, profile_name, name=None, session_id=None, bundle=None, environ=None,
-            print_mode=False, disallowed=(), resume=None, plugin_dirs=()):
+            print_mode=False, no_edit=False, resume=None, plugin_dirs=()):
     """Return (argv, variables to set, variable names to clear). In print mode
     the agent answers one prompt read from stdin and prints JSON (`claude -p`).
     Either way it runs in the folder it is started in, its own clone. `resume`
     continues an earlier session with its conversation, in the folder it ran in.
-    `plugin_dirs` are loaded whole after the bundle. The tools in NEVER are
-    always denied."""
+    `plugin_dirs` are loaded whole after the bundle. `no_edit` denies the edit
+    tools; the tools in NEVER are always denied."""
     profile = cfg["profiles"][profile_name]
     gateway = cfg["gateways"][profile["gateway"]]
     env, clear = gateway_env(gateway, profile, os.environ if environ is None else environ)
@@ -79,8 +80,12 @@ def command(cfg, profile_name, name=None, session_id=None, bundle=None, environ=
         argv += ["--plugin-dir", bundle]
     for d in plugin_dirs:
         argv += ["--plugin-dir", d]
-    argv += ["--disallowedTools", ",".join(dict.fromkeys([*disallowed, *NEVER]))]
+    argv += ["--disallowedTools", ",".join([*(EDIT_TOOLS if no_edit else []), *NEVER])]
     return argv, env, clear
+
+
+def prepare(workdir, bundle):
+    """Claude Code finds everything through --plugin-dir; the folder needs nothing."""
 
 
 def parse_print(text):
@@ -98,14 +103,20 @@ def parse_print(text):
     }
 
 
+def answer_file(text):
+    """`claude -p --output-format json` prints the answer file as it is."""
+    return text
+
+
 def skill_name(ref):
     return f"{PLUGIN}:{ref.split(':')[-1]}"
 
 
 def bundle_layout(skills):
-    """A Claude Code plugin that holds the skills and the heartbeat hooks;
-    `--plugin-dir` loads it. The hooks run the bundle's scripts/heartbeat.py,
-    which writes only when launch.py --status set AF_STATUS_FILE."""
+    """A Claude Code plugin at the bundle's root that holds the skills and the
+    heartbeat hooks; `--plugin-dir` loads it. The hooks run the bundle's
+    scripts/heartbeat.py, which writes only when launch.py --status set
+    AF_STATUS_FILE."""
     files = {".claude-plugin/plugin.json": json.dumps({
         "name": PLUGIN,
         "version": "1.0.0",

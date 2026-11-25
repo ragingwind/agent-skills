@@ -26,8 +26,8 @@ settings); --ref is what to check out (detached), such as `origin/main` or a
 head SHA. An existing clone of the same agent is kept (status `exists`);
 --fresh removes it first, under the same rules as remove.
 --instructions-from SHA, for a judging agent: the files an agent reads as
-instructions (`.claude/`, `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, at any
-depth) are put back as commit SHA has them (the base branch's head on GitHub,
+instructions (`.claude/`, `CLAUDE.md`, `CLAUDE.local.md`, `.agents/`,
+`.codex/`, `AGENTS.md`, at any depth) are put back as commit SHA has them (the base branch's head on GitHub,
 fetched from origin when the clone lacks it), so a change to them under
 review cannot steer the agent that reviews it. The diff it reviews is the
 commits', unchanged. A SHA it cannot get is an error.
@@ -74,7 +74,8 @@ WORK = "~/.cache/agent-foreman/work"
 TASKS = "~/.local/state/agent-foreman/tasks"
 MARK = "agent-foreman.json"
 NO_PUSH = "no-push-from-this-clone"
-INSTRUCTIONS = [":(glob)**/.claude/**", ":(glob)**/CLAUDE.md", ":(glob)**/CLAUDE.local.md", ":(glob)**/AGENTS.md"]
+INSTRUCTIONS = [":(glob)**/.claude/**", ":(glob)**/CLAUDE.md", ":(glob)**/CLAUDE.local.md", ":(glob)**/.agents/**",
+                ":(glob)**/.codex/**", ":(glob)**/AGENTS.md"]
 
 
 # --- runs on the agent's machine; standard library only ---------------------

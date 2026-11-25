@@ -14,20 +14,24 @@ never token values.
 The models are in one file the person edits, by provider:
 $XDG_CONFIG_HOME/agent-foreman/providers.json. When it exists, it replaces
 the standard gateways, profiles and tiers whole; `providers --init` copies
-providers.json.sample, which holds the standard's models, when it is missing. A provider without `base_url` is Anthropic (Claude
-Code's own login); one with it is anthropic-compatible and needs `auth`,
-`token_env` (the variable's name) and each model's `context`:
+providers.json.sample, which holds the standard's models, when it is missing.
+A provider's `agent` names the agent kind its models run (default claude). A
+provider without `base_url` is that agent's own login: Claude Code's
+(gateway kind anthropic) or Codex's (openai). One with it is
+anthropic-compatible, for claude only, and needs `auth`, `token_env` (the
+variable's name) and each model's `context`:
 
   {"providers": [
      {"id": "anthropic", "models": [{"id": "opus"}, {"id": "sonnet"}, {"id": "haiku"}]},
+     {"id": "openai", "agent": "codex", "models": [{"id": "gpt-5.5", "name": "gpt"}]},
      {"id": "tf", "base_url": "https://...", "auth": "bearer", "token_env": "TF_API_TOKEN",
       "models": [{"id": "zai-org/GLM-5.3-Flash", "name": "glm", "context": 200000}]}],
-   "tiers": {"low": ["haiku"], "mid": ["glm", "sonnet"], "high": ["opus", "sonnet"]}}
+   "tiers": {"low": ["haiku"], "mid": ["glm", "sonnet"], "high": ["opus", "gpt", "sonnet"]}}
 
 A model's `name` (default: its `id`) is its profile name, the one tiers use.
 `roles` maps a subagent's opus, sonnet and haiku to models of the same
-provider (default: the model itself); `agent` names the agent kind (default
-claude).
+provider (default: the model itself); a model's own `agent` overrides its
+provider's.
 
 Usage:
   config.py paths [--project OWNER/REPO]
@@ -73,7 +77,8 @@ import gate as gates
 import loop as loops
 
 APP = "agent-foreman"
-KINDS = ["anthropic", "anthropic-compatible"]
+KINDS = ["anthropic", "anthropic-compatible", "openai"]
+OWN_LOGIN = ["anthropic", "openai"]  # gateway kinds with no base_url: the agent's own login
 AUTHS = ["bearer", "x-api-key"]
 ROLES = ["opus", "sonnet", "haiku"]
 PERMISSIONS = ["bypass", "default"]
@@ -87,7 +92,7 @@ SECTIONS = ["plugin_dirs", "gateways", "profiles", "tiers", "difficulty", "launc
             "report", "ops"]
 PROJECT_KEYS = ["repo", "workspace", "machines", "tests", "gate", "post_answers"]
 MODEL_KEYS = ["gateways", "profiles", "tiers"]  # from providers.json, never from config.json or project.json
-PROVIDER_KEYS = ["id", "name", "base_url", "auth", "token_env", "models"]
+PROVIDER_KEYS = ["id", "name", "agent", "base_url", "auth", "token_env", "models"]
 MODEL_ENTRY_KEYS = ["id", "name", "context", "roles", "agent"]
 # Model tiers, lowest first. The red team and QA take one tier above the lead.
 TIERS = loops.LEVELS
@@ -297,8 +302,10 @@ def from_providers(data):
             continue
         models = [m for m in _entries(p.get("models")) if isinstance(m.get("id"), str)]
         names = {m["id"]: m.get("name") or m["id"] for m in models}
+        agent = p.get("agent", adapters.DEFAULT)
         if not p.get("base_url"):
-            gateways[p["id"]] = {"kind": "anthropic"}
+            own = adapters.ADAPTERS[agent].GATEWAY_KINDS[0] if agent in adapters.ADAPTERS else "anthropic"
+            gateways[p["id"]] = {"kind": own}
         else:
             gateways[p["id"]] = {"kind": "anthropic-compatible", "base_url": p["base_url"], "auth": p.get("auth"),
                                  "token_env": p.get("token_env"),
@@ -310,8 +317,8 @@ def from_providers(data):
             if p.get("base_url"):
                 roles = m.get("roles") if isinstance(m.get("roles"), dict) else {}
                 profile["roles"] = {r: roles.get(r, name) for r in ROLES}
-            if "agent" in m:
-                profile["agent"] = m["agent"]
+            if "agent" in m or "agent" in p:
+                profile["agent"] = m.get("agent", agent)
             profiles[name] = profile
     tiers = data.get("tiers") if isinstance(data.get("tiers"), dict) else {}
     return {"gateways": gateways, "profiles": profiles, "tiers": copy.deepcopy(tiers)}
@@ -338,6 +345,11 @@ def providers_problems(data):
         ids.add(p["id"])
         problems += [f"{where}: unknown key {k!r}" for k in p if k not in PROVIDER_KEYS]
         compatible = bool(p.get("base_url"))
+        agent = p.get("agent", adapters.DEFAULT)
+        if agent not in adapters.KINDS:
+            problems.append(f"{where}: agent must be one of {', '.join(adapters.KINDS)}, not {agent!r}")
+        elif compatible and "anthropic-compatible" not in adapters.get(agent).GATEWAY_KINDS:
+            problems.append(f"{where}: {agent} runs only on its own login; remove base_url, auth and token_env")
         if compatible:
             if not url_ok(p["base_url"]):
                 problems.append(f"{where}: base_url must be the provider's http:// or https:// address, "
@@ -517,7 +529,7 @@ def validate_launch(cfg):
         if g.get("kind") not in KINDS:
             problems.append(f"gateway {name}: unknown kind {g.get('kind')!r}")
             continue
-        if g["kind"] == "anthropic":
+        if g["kind"] in OWN_LOGIN:
             continue
         if not url_ok(g.get("base_url", "")):
             problems.append(f"gateway {name}: base_url must be an http:// or https:// address")
@@ -538,7 +550,12 @@ def validate_launch(cfg):
         if g is None:
             problems.append(f"profile {name}: gateway {p.get('gateway')!r} does not exist")
             continue
-        if g.get("kind") == "anthropic":
+        kind = adapters.kind_of(p)
+        if kind in adapters.KINDS and g.get("kind") not in adapters.get(kind).GATEWAY_KINDS:
+            problems.append(f"profile {name}: {kind} cannot run on gateway {p['gateway']} (kind {g.get('kind')}); "
+                            f"it runs on {', '.join(adapters.get(kind).GATEWAY_KINDS)}")
+            continue
+        if g.get("kind") in OWN_LOGIN:
             if not p.get("model"):
                 problems.append(f"profile {name}: model is empty")
             continue

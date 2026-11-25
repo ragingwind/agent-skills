@@ -4,8 +4,8 @@ how they change with a task's difficulty.
 
 Settings shape (`loop` in the settings):
 
-  roles    name -> {"mode": "prompt"|"pane", "step": 0|1, "prompt": key, "deny_tools": [...],
-                   "accept": [passing verdicts]}
+  roles    name -> {"mode": "prompt"|"pane", "step": 0|1, "prompt": key, "no_edit": true|false,
+                   "accept": [passing verdicts]}; no_edit takes the edit tools from the role's agent
   prompts  key -> fixed prompt text a role gets; `loop.py prompt` fills in
            <task>, <repo>, <base>, <head>, <diff>, <task folder>, <skill>,
            <skills>, <full test command> and <trivial>
@@ -119,9 +119,11 @@ def validate_loop(loop):
         accept = role.get("accept", [])
         if not isinstance(accept, list) or not all(isinstance(x, str) and x for x in accept):
             problems.append(f"loop: role {name}: accept must be a list of verdicts")
-        deny = role.get("deny_tools", [])
-        if not isinstance(deny, list) or not all(isinstance(t, str) and t for t in deny):
-            problems.append(f"loop: role {name}: deny_tools must be a list of tool names")
+        if not isinstance(role.get("no_edit", False), bool):
+            problems.append(f"loop: role {name}: no_edit must be true or false")
+        if "deny_tools" in role:
+            problems.append(f"loop: role {name}: deny_tools is replaced by no_edit (true: the agent edits no file, "
+                            f"whatever its kind)")
     if not loop.get("work"):
         problems.append("loop: the work loop has no steps")
     for which in LOOPS:
@@ -339,7 +341,7 @@ def shown_skills(step, resolved, call_name, overrides):
 
 def recorded_defaults(skills):
     import adapters
-    kit_plugin = re.escape(adapters.get(adapters.DEFAULT).PLUGIN)
+    kit_plugin = re.escape(adapters.PLUGIN)
     defaults = []
     for skill in skills:
         m = (re.search(rf"\(flow and record: {kit_plugin}:([a-z-]+)\)", skill)
@@ -406,7 +408,7 @@ def as_data(cfg, task, difficulty, trivial, resolved, call_name, repo, base, lea
                 role = loop["roles"][r]
                 out["roles"][r] = {"mode": role["mode"], "prompt": loop["prompts"].get(role.get("prompt"), ""),
                                    "accept": role.get("accept", ["approved"]),
-                                   "deny_tools": role.get("deny_tools", []), "profiles": profiles.get(r, [])}
+                                   "no_edit": role.get("no_edit", False), "profiles": profiles.get(r, [])}
     return out
 
 
@@ -472,9 +474,9 @@ def role_run(task_loop, task_dir, step_id, agent, head, launch):
     prompt_file, out = os.path.join(reviews, f"{agent}-{n}.prompt.md"), os.path.join(reviews, f"{agent}-{n}.json")
     m = re.search(r"-(\d+)$", agent)
     first = (int(m.group(1)) - 1) % len(candidates) if m else 0
-    deny = role.get("deny_tools", [])
+    no_edit = role.get("no_edit", bool(role.get("deny_tools")))  # a loop.json written before no_edit
     commands = [shlex.join(["python3", launch, p, "--print", "--role", r, "--name", agent, "--task-dir", task_dir,
-                            "--prompt-file", prompt_file, "--out", out] + (["--disallow", ",".join(deny)] if deny else []))
+                            "--prompt-file", prompt_file, "--out", out] + (["--no-edit"] if no_edit else []))
                 for p in candidates[first:] + candidates[:first]]
     return {"agent": agent, "text": text, "prompt": prompt_file, "out": out, "commands": commands}
 

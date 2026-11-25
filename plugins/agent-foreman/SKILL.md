@@ -107,7 +107,7 @@ foreman session. This session keeps the old path.
 | `scripts/errors.py` | Error reports: `new`, `collect` (the task's records into the report), `set`, `add`, `list`, `show`, `check` |
 | `scripts/session.py` | The plugin's hooks: each turn's end notes where this conversation is; a new foreman session starts with the earlier one's last exchanges |
 | `terminals/herdr.md`, `terminals/prompt.md` | How to open, start, send to, read, wait on and close an agent, in a herdr pane or in prompt mode |
-| `adapters/<kind>.md` | What differs per agent kind: trust question, input line, exit. Only `claude` today |
+| `adapters/<kind>.md` | What differs per agent kind: trust question, input line, exit. `claude` and `codex` |
 | `loop.md` | The lead's guide to its build session; every bundle carries it |
 | `kit/skills/` | The default skills, one per loop action; every bundle carries them as `foreman-kit:<name>` |
 | `setup/` | Setting up: `setup.md` runs the parts in order; `models.md`, `project.md`, `loop.md`, `other.md` hold each part |
@@ -332,7 +332,8 @@ Write the task's files into its task folder on the lead's machine
    <task> --session-id <id> --task-dir <task folder>` (`terminals/herdr.md`
    "Start an agent").
 4. Right after step 3, run `clone.py trust <clone> --pane <pane> --machine
-   <machine>`. It answers a new clone's trust question as soon as it shows,
+   <machine> --kind <kind>`, with the profile's agent kind. It answers a new
+   clone's trust question as soon as it shows,
    and returns when the agent is idle (the adapter page, "Trust question").
    Then rename the agent to `<task>`; the rename succeeding is the proof it
    runs.

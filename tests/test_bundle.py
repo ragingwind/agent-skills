@@ -45,9 +45,10 @@ class Bundle(unittest.TestCase):
         for rel in ("bundle.json", ".claude-plugin/plugin.json", "config.json", "loop.md", "scripts/launch.py",
                     "scripts/config.py", "scripts/transcript.py", "scripts/gate.py", "scripts/status.py",
                     "scripts/clone.py", "scripts/loop.py", "scripts/heartbeat.py", "scripts/fulltest.py",
-                    "scripts/adapters/__init__.py",
-                    "scripts/adapters/base.py", "scripts/adapters/claude.py"):
+                    "scripts/hook.py", "scripts/adapters/__init__.py",
+                    "scripts/adapters/base.py", "scripts/adapters/claude.py", "scripts/adapters/codex.py"):
             self.assertIn(rel, files)
+        self.assertEqual(json.loads(files["bundle.json"]), {"agents": ["claude", "codex"]})  # one bundle, every kind
         self.home.write("skills/tidy/SKILL.md", "---\nname: tidy\n---\nTidy more.")
         h3, _, _, _ = bundle.build("o/r", [])
         self.assertNotEqual(h1, h3)

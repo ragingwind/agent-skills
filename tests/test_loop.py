@@ -86,14 +86,16 @@ class Validate(unittest.TestCase):
                 self.assertEqual(list(s["next"])[-1], role["accept"][0], s["id"])
 
     def test_problems(self):
-        bad = {"roles": {"lead": {"mode": "tab"}, "r": {"mode": "prompt", "prompt": "none", "deny_tools": "Edit"}},
+        bad = {"roles": {"lead": {"mode": "tab"}, "r": {"mode": "prompt", "prompt": "none", "deny_tools": ["Edit"]},
+                         "q": {"mode": "prompt", "no_edit": "yes"}},
                "prompts": {"x": " "},
                "work": [stage("a", nxt={"done": "nowhere"}), stage("a", actor="ghost"),
                         stage("b", run={"huge": "always", "mid": "if-user-visible"}),
                         {"id": "c", "actor": "lead", "does": "", "skills": "x", "next": {}}]}
         p = "\n".join(loop.validate_loop(bad))
         for words in ("prompt x is empty", "role name 'lead' is not allowed", "mode must be one of",
-                      "prompt 'none' does not exist", "deny_tools must be a list", "goes to 'nowhere'",
+                      "prompt 'none' does not exist", "role r: deny_tools is replaced by no_edit",
+                      "role q: no_edit must be true or false", "goes to 'nowhere'",
                       "step a appears twice", "actor 'ghost'", "names 'huge'", "run for mid",
                       "says nothing", "skills must be a list", "next must name"):
             self.assertIn(words, p)
@@ -502,10 +504,21 @@ class Prompt(unittest.TestCase):
         launch = os.path.join(SCRIPTS, "launch.py")
         self.assertEqual(out["commands"][0].split(), [
             "python3", launch, "opus", "--print", "--role", "pair", "--name", "pair-1", "--task-dir", self.task,
-            "--prompt-file", out["prompt"], "--out", out["out"], "--disallow", "Edit,Write,NotebookEdit"])
+            "--prompt-file", out["prompt"], "--out", out["out"], "--no-edit"])
         self.assertEqual(len(out["commands"]), 1)  # the mid and high tiers hold sonnet and opus; sonnet is the lead
         again = json.loads(self.prompt("--step", "review", "--task-dir", self.task).stdout)
         self.assertEqual(os.path.basename(again["prompt"]), "pair-1-2.prompt.md")  # never over an earlier run
+
+    def test_a_loop_json_from_before_no_edit_still_denies_edits(self):
+        data = task_loop(difficulty="mid", lead="sonnet")
+        for role in data["roles"].values():
+            del role["no_edit"]
+        data["roles"]["pair"]["deny_tools"] = ["Edit", "Write", "NotebookEdit"]
+        found = loop.role_run(data, self.task, "review", None, self.head, "launch.py")
+        self.assertTrue(found["commands"][0].endswith(" --no-edit"), found["commands"][0])
+        del data["roles"]["pair"]["deny_tools"]
+        found = loop.role_run(data, self.task, "review", None, self.head, "launch.py")
+        self.assertNotIn("--no-edit", found["commands"][0])
 
     def test_recheck_reviews_only_what_changed_since_the_last_answer(self):
         r = self.prompt("--step", "recheck", "--task-dir", self.task)

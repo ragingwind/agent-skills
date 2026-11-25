@@ -88,10 +88,11 @@ class Checks(unittest.TestCase):
 
     def test_agent_instructions_count_as_weakening(self):
         files = [{"filename": f, "status": "modified", "patch": ""} for f in
-                 (".claude/skills/review/SKILL.md", "CLAUDE.md", "pkg/AGENTS.md", "docs/claude.txt")]
+                 (".claude/skills/review/SKILL.md", "CLAUDE.md", "pkg/AGENTS.md", ".agents/skills/x/SKILL.md",
+                  ".codex/hooks.json", "docs/claude.txt", "docs/agents.md")]
         ok, evidence = check("tests-weakened", pr(files=files))
         self.assertFalse(ok)
-        self.assertEqual(evidence.count("edited agent instructions"), 3, evidence)
+        self.assertEqual(evidence.count("edited agent instructions"), 5, evidence)
         self.assertTrue(check("tests-weakened", pr(files=files), allow=["agent-files"])[0])
 
     def test_size_ready_and_skips(self):

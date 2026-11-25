@@ -3,17 +3,17 @@
 
 Usage:
   python3 launch.py PROFILE [--name NAME] [--session-id UUID | --resume UUID] [--project OWNER/REPO]
-                    [--task-dir DIR] [--status FILE] [--disallow TOOL,...] [--dry-run]
+                    [--task-dir DIR] [--status FILE] [--no-edit] [--dry-run]
   python3 launch.py PROFILE --print --prompt-file FILE --out FILE [--role ROLE] [--name NAME]
-                    [--session-id UUID] [--task-dir DIR] [--status FILE] [--disallow TOOL,...] [--dry-run]
+                    [--session-id UUID] [--task-dir DIR] [--status FILE] [--no-edit] [--dry-run]
 
 --resume UUID starts the agent again with its earlier conversation (the
 session id the ledger holds), in the clone it ran in: a lead whose process
 ended keeps what it knew. It does not go with --print or --session-id.
 
---disallow TOOL,... removes tools from the agent (a reviewer gets no edit
-tools). The adapter also denies merging a pull request to every agent: the
-foreman merges. Both narrow what the agent can do; neither is a sandbox.
+--no-edit takes the edit tools from the agent (a reviewer edits no file).
+The adapter also denies merging a pull request to every agent: the foreman
+merges. Both narrow what the agent can do; neither is a sandbox.
 
 Run from a bundle, each plugin its config.json names (one whose skill the
 project's loops use) is loaded into the agent whole from the bundle's
@@ -28,10 +28,11 @@ them the variables are cleared, so an agent never writes into the status file
 of the agent that started it.
 
 The profile's `agent` kind (default `claude`) picks the adapter that builds
-the command (scripts/adapters/). Run from a bundle (a directory that holds
-`bundle.json` and `config.json` next to `scripts/`), it uses the bundle's
-settings and loads the bundle's skills into the agent. Run from the skill, it
-uses the merged settings (`--project` adds the project's).
+the command (scripts/adapters/) and prepares the folder the agent runs in
+(for codex, it links the skills there). Run from a bundle (a directory that
+holds `bundle.json` and `config.json` next to `scripts/`), it uses the
+bundle's settings and loads the bundle's skills into the agent. Run from the
+skill, it uses the merged settings (`--project` adds the project's).
 
 PROFILE is the one the foreman picked from the tier. The script sets the
 gateway's environment for this process only and replaces itself with the
@@ -80,10 +81,11 @@ def fail(code, message):
 
 
 def bundle_root():
-    """(bundle directory, its agent kind), or (None, None) when run from the skill."""
+    """(bundle directory, the agent kinds it serves), or (None, None) when run from the skill."""
     marker = os.path.join(ROOT, "bundle.json")
     if os.path.isfile(marker) and os.path.isfile(os.path.join(ROOT, "config.json")):
-        return ROOT, read_json(marker).get("agent", adapters.DEFAULT)
+        data = read_json(marker)
+        return ROOT, data.get("agents") or [data.get("agent", adapters.DEFAULT)]
     return None, None
 
 
@@ -98,7 +100,7 @@ def main():
                         help="answer one prompt and exit (prompt mode)")
     parser.add_argument("--prompt-file", help="with --print: the prompt")
     parser.add_argument("--out", help="with --print: where the agent's JSON result goes")
-    parser.add_argument("--disallow", default="", metavar="TOOL,...", help="tools the agent may not use")
+    parser.add_argument("--no-edit", action="store_true", help="the agent edits no file (a judging role)")
     parser.add_argument("--status", metavar="FILE", help="the task's status file, for heartbeats and stage notes")
     parser.add_argument("--task-dir", metavar="DIR", help="the task folder; sets AF_TASK_DIR and its status file")
     parser.add_argument("--role", help="with --print: the loop role this agent plays, recorded for the gate")
@@ -125,7 +127,7 @@ def main():
         if head_commit() is None:
             fail(2, "with --role, run it in the agent's own clone; this directory is not a git checkout")
 
-    bundle, bundle_kind = bundle_root()
+    bundle, bundle_kinds = bundle_root()
     if bundle:
         cfg = read_json(os.path.join(bundle, "config.json"))
         where = os.path.join(bundle, "config.json")
@@ -141,8 +143,9 @@ def main():
     if profile is None:
         fail(EXIT_SETUP_NEEDED, f"profile {profile_name!r} does not exist")
     kind = adapters.kind_of(profile)
-    if bundle and kind != bundle_kind:
-        fail(EXIT_SETUP_NEEDED, f"profile {profile_name} runs {kind}, but this bundle is for {bundle_kind}")
+    if bundle and kind not in bundle_kinds:
+        fail(EXIT_SETUP_NEEDED, f"profile {profile_name} runs {kind}, but this bundle serves "
+                                f"{', '.join(bundle_kinds)}; push the bundle again (bundle.py push)")
     adapter = adapters.get(kind)
     plugin_dirs = [os.path.join(bundle, "plugins", n) for n in cfg.get("plugins", [])] if bundle else []
     gone = [d for d in plugin_dirs if not os.path.isfile(os.path.join(d, ".claude-plugin", "plugin.json"))]
@@ -150,8 +153,7 @@ def main():
         fail(EXIT_SETUP_NEEDED, f"the bundle lacks the plugin at {gone[0]}; push the bundle again (bundle.py push)")
     try:
         argv, env, clear = adapter.command(cfg, profile_name, name=args.name, session_id=args.session_id,
-                                           bundle=bundle, print_mode=args.print_mode,
-                                           disallowed=[t.strip() for t in args.disallow.split(",") if t.strip()],
+                                           bundle=bundle, print_mode=args.print_mode, no_edit=args.no_edit,
                                            resume=args.resume, plugin_dirs=plugin_dirs)
     except adapters.TokenMissing as e:
         fail(EXIT_TOKEN_MISSING, f"token variable {e.variable} is not set in this environment")
@@ -174,6 +176,10 @@ def main():
         return 0
     if shutil.which(adapter.EXECUTABLE) is None:
         fail(EXIT_SETUP_NEEDED, f"{adapter.EXECUTABLE} is not on PATH")
+    try:
+        adapter.prepare(os.getcwd(), bundle)
+    except OSError as e:
+        fail(EXIT_SETUP_NEEDED, f"cannot prepare {os.getcwd()} for {kind}: {e}")
     child = {k: v for k, v in os.environ.items() if k not in clear}
     child.update(env)
     if not args.print_mode:
@@ -215,7 +221,7 @@ def run_once(adapter, argv, env, prompt_file, out, meta=None):
         proc = subprocess.run(argv, stdin=prompt, capture_output=True, env=env)
     text = proc.stdout.decode("utf-8", "replace")
     stderr = proc.stderr.decode("utf-8", "replace")
-    write_atomic(out, text)
+    write_atomic(out, adapter.answer_file(text))
     summary = adapter.parse_print(text)
     ok = summary["ok"] and proc.returncode == 0
     verdict = last_verdict(summary["result"]) if ok else ""
