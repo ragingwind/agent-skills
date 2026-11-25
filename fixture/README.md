@@ -11,6 +11,7 @@ what real agents do.
 | `tasks/` | The tasks, as the foreman registers them: `1.md` (mid difficulty), `2.md` (high, so the foreman checks the plan) |
 | `bin/gh` | A local stand-in for GitHub's `gh`: pull requests, their checks (`make test` on the head), labels, merges, issues, and the API calls the gate makes, in a state file. Anything else is refused and listed in the report |
 | `run.py` | The run |
+| `sandbox.py` | Makes and deletes a private GitHub repository with this project, for a live run of the real foreman ("A live run on GitHub") |
 
 ```bash
 python3 fixture/run.py --dry-run     # prepare everything, call no model
@@ -63,3 +64,37 @@ the agent did, not as a test that broke.
 `repo/` keeps the project's `.github` as `dot-github` and its guide as
 `CLAUDE.fixture.md`, so an agent working in this repository does not read
 them as its own; the run copies them under their real names.
+
+## A live run on GitHub
+
+`run.py` leaves out GitHub, setup, the foreman's watching and its herdr
+tabs. To try those, run the real foreman on a sandbox: a private GitHub
+repository with this project, and its tasks as issues. Make one for a run,
+and delete it after.
+
+```bash
+python3 fixture/sandbox.py create                    # the repository, its issues and the delete command
+python3 fixture/sandbox.py list                      # the sandboxes still on GitHub
+python3 fixture/sandbox.py delete <owner>/<name>
+```
+
+1. Make a sandbox with `create`. To make it in an organization, add
+   `--owner <org>`.
+2. Clone it with the `clone` command that `create` printed.
+3. In the clone, run setup and start the foreman, as the plugin's README
+   says ("Setup"). The full test command is `make test`.
+4. Name the issues to the foreman. CI runs `make test` on each pull request.
+5. When the run is over, delete the sandbox with the `delete` command that
+   `create` printed.
+
+- `delete` removes a repository only when its name starts with
+  `agent-foreman-sandbox-` and its description is the one `create` set. It
+  refuses any other repository.
+- Deleting needs the token scope `delete_repo`. To add it, run
+  `gh auth refresh -h github.com -s delete_repo`.
+- `delete` leaves what the foreman made for the sandbox on each machine: the
+  project settings in `~/.local/state/agent-foreman/projects/<owner>-<name>/`,
+  the task folders in `~/.local/state/agent-foreman/tasks/`, and the clones
+  in `~/.cache/agent-foreman/work/`. Remove them by hand.
+- A run costs real tokens, and CI on a private repository uses the
+  account's GitHub Actions minutes.
