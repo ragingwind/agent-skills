@@ -85,6 +85,7 @@ def contents(cfg, skill_dirs, kind=adapters.DEFAULT, plugins=None):
         "bundle.json": json.dumps({"agent": kind}).encode() + b"\n",
         "config.json": json.dumps(settings, indent=2, sort_keys=True).encode() + b"\n",
         "loop.md": _read(os.path.join(SKILL_DIR, "loop.md")),
+        "tester.md": _read(os.path.join(SKILL_DIR, "tester.md")),
     }
     for name in BUNDLED:
         files[f"scripts/{name}"] = _read(os.path.join(HERE, name))
