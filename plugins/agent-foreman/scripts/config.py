@@ -25,8 +25,8 @@ variable's name) and each model's `context`:
      {"id": "anthropic", "models": [{"id": "opus"}, {"id": "sonnet"}, {"id": "haiku"}]},
      {"id": "openai", "agent": "codex", "models": [{"id": "gpt-5.5", "name": "gpt"}]},
      {"id": "tf", "base_url": "https://...", "auth": "bearer", "token_env": "TF_API_TOKEN",
-      "models": [{"id": "zai-org/GLM-5.3-Flash", "name": "glm", "context": 200000}]}],
-   "tiers": {"low": ["haiku"], "mid": ["glm", "sonnet"], "high": ["opus", "gpt", "sonnet"]}}
+      "models": [{"id": "example-org/Model-Flash", "name": "flash", "context": 200000}]}],
+   "tiers": {"low": ["haiku"], "mid": ["flash", "sonnet"], "high": ["opus", "gpt", "sonnet"]}}
 
 A model's `name` (default: its `id`) is its profile name, the one tiers use.
 `roles` maps a subagent's opus, sonnet and haiku to models of the same

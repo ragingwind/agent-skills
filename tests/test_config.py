@@ -195,9 +195,9 @@ class Problems(unittest.TestCase):
 
 
 TF = {"id": "tf", "base_url": "https://tf.example", "auth": "bearer", "token_env": "TF_API_TOKEN",
-      "models": [{"id": "zai-org/GLM-5.3-Flash", "name": "glm", "context": 200000},
-                 {"id": "zai-org/GLM-5.3-Air", "name": "glm-air", "context": 128000, "roles": {"haiku": "glm"}}]}
-TF_TIERS = {"low": ["glm", "haiku"], "mid": ["glm", "sonnet"], "high": ["opus", "sonnet"]}
+      "models": [{"id": "example-org/Model-Flash", "name": "flash", "context": 200000},
+                 {"id": "example-org/Model-Air", "name": "flash-air", "context": 128000, "roles": {"haiku": "flash"}}]}
+TF_TIERS = {"low": ["flash", "haiku"], "mid": ["flash", "sonnet"], "high": ["opus", "sonnet"]}
 
 
 class Providers(unittest.TestCase):
@@ -238,14 +238,14 @@ class Providers(unittest.TestCase):
         cfg = config.load()
         self.assertEqual(cfg["gateways"]["tf"], {"kind": "anthropic-compatible", "base_url": "https://tf.example",
                                                  "auth": "bearer", "token_env": "TF_API_TOKEN",
-                                                 "models": {"glm": {"id": "zai-org/GLM-5.3-Flash", "context": 200000},
-                                                            "glm-air": {"id": "zai-org/GLM-5.3-Air", "context": 128000}}})
-        self.assertEqual(cfg["profiles"]["glm"]["roles"], {"opus": "glm", "sonnet": "glm", "haiku": "glm"})
-        self.assertEqual(cfg["profiles"]["glm-air"]["roles"], {"opus": "glm-air", "sonnet": "glm-air", "haiku": "glm"})
+                                                 "models": {"flash": {"id": "example-org/Model-Flash", "context": 200000},
+                                                            "flash-air": {"id": "example-org/Model-Air", "context": 128000}}})
+        self.assertEqual(cfg["profiles"]["flash"]["roles"], {"opus": "flash", "sonnet": "flash", "haiku": "flash"})
+        self.assertEqual(cfg["profiles"]["flash-air"]["roles"], {"opus": "flash-air", "sonnet": "flash-air", "haiku": "flash"})
         self.assertEqual(cfg["profiles"]["opus"], {"gateway": "anthropic", "model": "opus"})
         self.assertEqual(config.validate(cfg), [])
         self.assertEqual(config.token_names(cfg), ["TF_API_TOKEN"])
-        self.assertEqual(config.role_candidates(cfg, "mid", "pair", lead="glm"), ["sonnet", "opus"])
+        self.assertEqual(config.role_candidates(cfg, "mid", "pair", lead="flash"), ["sonnet", "opus"])
 
     def test_a_codex_provider(self):
         self.write(providers({"id": "openai", "agent": "codex", "models": [{"id": "gpt-5.5", "name": "gpt"},
@@ -270,15 +270,15 @@ class Providers(unittest.TestCase):
 
     def test_problems_in_the_file_s_own_terms(self):
         bad = providers({"id": "tf", "base_url": "ftp://x", "auth": "basic", "token_env": "sk-123 secret",
-                         "models": [{"id": "zai-org/GLM"}, {"id": "m", "roles": {"opus": "ghost", "huge": "m"}},
+                         "models": [{"id": "example-org/Model"}, {"id": "m", "roles": {"opus": "ghost", "huge": "m"}},
                                     {"id": "sonnet", "context": 9}]},
                         {"id": "anthropic", "auth": "bearer", "models": [{"id": "opus[1m]", "context": 1}]},
                         tiers={"low": ["nope"], "mid": [], "huge": ["opus"]})
         bad["extra"] = 1
         p = config.providers_problems(bad)
         for want in ("unknown key 'extra'", "provider tf: base_url must be the provider's", "provider tf: auth must be",
-                     "provider tf: token_env must name", "model zai-org/GLM: needs a name",
-                     "model zai-org/GLM: context must be", "roles: opus names 'ghost'", "roles: 'huge' is not",
+                     "provider tf: token_env must name", "model example-org/Model: needs a name",
+                     "model example-org/Model: context must be", "roles: opus names 'ghost'", "roles: 'huge' is not",
                      "model sonnet: the name sonnet is taken", "another provider has the same id",
                      "provider anthropic: auth applies only", "context and roles apply only",
                      "tiers: low names 'nope'", "tiers: mid must list", "unknown tier 'huge'", "tiers: high is missing"):

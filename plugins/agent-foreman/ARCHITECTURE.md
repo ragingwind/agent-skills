@@ -87,7 +87,7 @@ profile's). The pair, the red team and QA never run on the lead's profile.
 │ pane 1: lead                      │              │               │
 │ prompt runs: pair, red team, QA   │              │               │
 ├───────────────────────────────────┴──────────────┴───────────────┤
-│ agent adapter: claude                  (later: other kinds)      │
+│ agent adapter: claude, codex                                     │
 └──────────────────────────────────────────────────────────────────┘
 ```
 

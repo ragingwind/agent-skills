@@ -52,7 +52,7 @@ already passes the check and the person has nothing to add, go on.
       "auth": "bearer",
       "token_env": "TF_API_TOKEN",
       "models": [
-        {"id": "zai-org/GLM-5.3-Flash", "name": "glm", "context": 200000}
+        {"id": "example-org/Model-Flash", "name": "flash", "context": 200000}
       ]
     },
     {
@@ -62,8 +62,8 @@ already passes the check and the person has nothing to add, go on.
     }
   ],
   "tiers": {
-    "low": ["glm", "haiku"],
-    "mid": ["glm", "sonnet"],
+    "low": ["flash", "haiku"],
+    "mid": ["flash", "sonnet"],
     "high": ["opus", "gpt", "sonnet"]
   }
 }
