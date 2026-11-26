@@ -121,8 +121,13 @@ pair's answer from `reviews/` and refuses an answer from your own model.
    outcome (`approved` or `changes`). No verdict: run it once more; then stop
    as blocked.
 
-After the third `recheck` that still says `changes`, stop at a decision
-point.
+After an approval, and in a recheck, the pair reads only the change since
+its last answer, and across a rebase a `git range-diff`; `loop.py prompt`
+writes that into the prompt. For a recheck it also prints `recheck` (its
+number in this review) and `recheck_limit` (the pair's setting, 2 by
+default). Past the limit, only a must-fix in the change since the last
+recheck blocks. A recheck past the limit that still says `changes` is a
+decision point.
 
 ## Finalize and the gate
 
