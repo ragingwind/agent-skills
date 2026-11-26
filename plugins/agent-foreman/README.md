@@ -7,8 +7,8 @@ foreman:
 - writes the task down in one task folder, and rates its risk;
 - starts a **lead** agent that builds it in its own clone (the **build
   session**);
-- starts a **red team** and **QA** on other models to check it (the
-  **verification session**);
+- starts a **tester** on another model that checks it as the **red team**,
+  then as **QA** (the **verification session**);
 - runs a scripted gate, then merges, or leaves the merge to you when the risk
   is high.
 
@@ -21,7 +21,7 @@ The foreman writes no code and reviews no code itself.
 | Foreman | This Claude Code session. You talk only to it |
 | Lead | The agent that builds one task, from the plan to a ready pull request |
 | Pair | Another model that reviews the lead's work inside the build session |
-| Red team, QA | Agents on other models in the verification session. The red team tries to break the change; QA runs the full tests and the user scenario test |
+| Red team, QA | The verification session's roles, which one tester per task runs on another model. The red team tries to break the change; QA runs the full tests and the user scenario test |
 | Task folder | One folder per task that holds every record: the task, the plan, the scenario, the handoff, every review and the status |
 | Default skill | What one loop action is, shipped with agent-foreman. A project or local skill can replace how it is done, add to a step, or run a whole step |
 | Difficulty | Low, mid or high. It picks the models and who merges |
@@ -41,8 +41,8 @@ The foreman writes no code and reviews no code itself.
    │                │            gate.py record       │
    │                │ coordinate                      │ review, recheck ─▶ PAIR
    │                │◀────────────────── REPORT ready │
-   │                │ verify-session ─────────────────────────────────────▶ RED TEAM ∥ QA
-   │                │◀──────────────────────────────────────────── verdicts
+   │                │ verify-session ─────────────────────────────────────▶ TESTER: RED TEAM, then QA
+   │                │◀─────────────────────────────── stamp.py ◀───── answers
    │                │ sent back? ── findings-r<N>.md ▶│ round N+1
    │                │ merge-gate  gate.py run --sha   │
    │                │ merge                           │
@@ -170,12 +170,14 @@ in setup. The foreman never answers a permission prompt.
 ## Security
 
 - **On each machine** it writes under `~/.cache/agent-foreman/` (bundles and
-  agent clones) and `~/.local/state/agent-foreman/tasks/` (task folders). It
+  agent clones), `~/.local/state/agent-foreman/tasks/` (task folders) and
+  `~/.local/state/agent-foreman/testing/` (tester folders). It
   never writes into your checkout.
 - **Trust**: the foreman answers Claude Code's folder trust question only for
   a clone it made.
-- **Judging agents** (pair, red team, QA) run without edit tools, in clones
-  that cannot push. This narrows them; it is not a sandbox.
+- **Judging agents**: the pair runs without edit tools; the tester keeps
+  them to write its answers in its own folder. Both work in clones that
+  cannot push. This narrows them; it is not a sandbox.
 - **Secrets**: settings and records hold token variable names only.
 
 ## Updating and uninstalling

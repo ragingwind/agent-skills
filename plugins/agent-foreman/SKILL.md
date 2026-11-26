@@ -35,7 +35,7 @@ task goes on.**
 | Who | Evidence | How the foreman checks it |
 | --- | --- | --- |
 | The lead, at each step's end | The `--done` of its `end` line: the skills the step ran and where each record is (`work-breakdown: plan.md 4 rows; cross-check: scenario.md 6 steps`, `commit: W1 3f2a9c1, W2 8b1d0e4`). `status.py` refuses an `end` line without it | `gate.py record --step <step> --task-dir <task folder> --cwd <lead's clone>` checks each default skill's record behind the line |
-| The pair, the red team, QA | Their answer, saved by `launch.py --role` at the commit they judged: each finding with its evidence, and a `Verdict:` | The gate's verdict checks, and `gate.py record` for their step |
+| The pair, the red team, QA | Their answer at the commit they judged: the pair's saved by `launch.py --role`, the red team's and QA's stamped from the tester's (`stamp.py`). Each finding with its evidence, and a `Verdict:` | The gate's verdict checks, and `gate.py record` for their step |
 | A project's own skill in a step | The record of the default skill it replaces, and its own result (commits, a pull request) in the lead's line | The same as the lead's |
 | The lead before ready, and the foreman before merge | The gate | `gate.py run` |
 
@@ -96,9 +96,10 @@ foreman session. This session keeps the old path.
 | `scripts/loop.py` | Loops: `show` the stages and steps, `render` one task's loop (`--json` for `loop.json`), `prompt` a role agent's prompt and launch commands from `loop.json`, `post` a saved answer on the pull request |
 | `scripts/gate.py` | Pass conditions as code: `record` checks one step's evidence when it ends, `template` writes a task's gate file from its `loop.json`, `hash` its hash for the ledger, `run` checks it |
 | `scripts/bundle.py` | `push <machine>`: the project's bundle (skills, scripts, lead guide), put on a machine once |
-| `scripts/clone.py` | Agent clones: `make`, `check` (made by the foreman), `remove` (refuses to lose work), `archive` (the task folder to the foreman's project folder) |
+| `scripts/clone.py` | Agent clones: `make` (`--pr` for the tester), `check` (made by the foreman), `remove` (refuses to lose work), `archive` (the task folder to the foreman's project folder) |
 | `scripts/launch.py` | Starts one agent from a profile; run it from the bundle |
-| `scripts/status.py` | Task folders: `dir` and `path` (its status file) for a task, `read` (every task and the free disk on the project's machines) |
+| `scripts/status.py` | Task folders: `dir` and `path` (its status file) for a task, `--testing` for its tester folder, `read` (every task, its testing session, and the free disk on the project's machines) |
+| `scripts/stamp.py` | The tester's answers of a round, checked and stamped, into the task folder as the red team's and QA's answers |
 | `scripts/log.py` | The project's log: `add`, `tail` |
 | `scripts/retro.py` | `facts`: what the project's finished tasks show (steps gone back to, minutes, findings, gate blocks, stops, stalls), for the retro |
 | `scripts/transcript.py` | A session's last answers, whole |
@@ -109,6 +110,7 @@ foreman session. This session keeps the old path.
 | `terminals/herdr.md`, `terminals/prompt.md` | How to open, start, send to, read, wait on and close an agent, in a herdr pane or in prompt mode |
 | `adapters/<kind>.md` | What differs per agent kind: trust question, input line, exit. Only `claude` today |
 | `loop.md` | The lead's guide to its build session; every bundle carries it |
+| `tester.md` | The tester's guide to its rounds; every bundle carries it |
 | `kit/skills/` | The default skills, one per loop action; every bundle carries them as `foreman-kit:<name>` |
 | `setup/` | Setting up: `setup.md` runs the parts in order; `models.md`, `project.md`, `loop.md`, `other.md` hold each part |
 | `error-report.md` | How to write an error report: open, collect, reproduce, cause, fix, tell the person |
@@ -124,7 +126,12 @@ foreman session. This session keeps the old path.
   labelled with the settings' `workspace`.
 - **Lead**: the agent that does one task. **Role agent**: one that judges a
   step: the **pair** (the lead starts it in the build session), the **red
-  team** and **QA** (the foreman starts them in the verification session).
+  team** and **QA** (the verification session's roles, which the task's
+  tester runs).
+- **Tester**: one session per task, separate from the lead's, that runs the
+  red team and then QA each round (`tester.md`). Its **tester folder**
+  (`status.py dir --testing`) holds its brief, `task.md`, its answers and its
+  `status.jsonl`, outside the task folders.
 - **Build session** (`loop.work`): plan, build, verify, review, finalize.
   **Verification session** (`loop.check`): redteam-review, test. Each stage
   is a run of steps; `loop.py show [--loop check]` lists them.
@@ -195,9 +202,9 @@ list --project <repo>` shows them.
 
 ## Resume
 
-When this session ends, what ran inside it ends too: the check timer, the
-waits on the agents, and the red team's and QA's runs. Leads and pairs run
-in their own panes and keep going. The ledger and the task folders hold the
+When this session ends, what ran inside it ends too: the check timer and
+the waits on the agents. Leads, their pairs and testers run in their own
+panes and keep going. The ledger and the task folders hold the
 rest. A new session opens with the earlier foreman's last exchanges (the
 plugin's start hook adds them, `scripts/session.py`): read them first, for
 what the person asked and what waits on them; the whole conversation is in
@@ -217,10 +224,10 @@ the file they name. Then, at the start of every session, one resumed with
      folder>` (the session is the ledger's), then send it one line: "You
      were restarted. Read the last lines of status.jsonl and go on."
    - **A check step has a `start` line and no `end`** (the verification
-     session): when `reviews/` holds that role's answer at the head (its
-     `.json` and `.meta.json`), write the `end` line from it ("Verification
-     session" 4). Otherwise its run ended with the old session: run that step
-     again; `loop.py prompt` writes the next prompt.
+     session): when the tester's last turn ended with `REPORT: tested`,
+     stamp that round ("Verification session", "Each round" 3). When the
+     tester works, wait on it again. When it is gone, act as for a lead that
+     is gone, with its own session.
    - **It waits on the person**: ask again.
 3. Start the check timer again (Preflight 7).
 4. Report once: each task, where it was, and what you resumed.
@@ -243,6 +250,14 @@ dependency order, from the issue or from the project's planning skill. When
 it does, use that plan. Each unit is a task, and its order is the start
 order ("Place"). Start nothing through the project's own wave or batch
 runner. The foreman starts every lead, and the foreman merges.
+
+**Size each task before launch.** The budget is `difficulty.lines` added
+lines, without lockfiles and generated files; a new task's gate blocks over
+it. Estimate the task's added lines, tests included, from the issue and the
+files it touches: the estimate you give `score.py estimate --lines`. When it
+is over the budget, split the task before launch into tasks under it: stack
+layers, each on the branch before it, or new issues. Each `task.md`'s Out of
+scope names what the others hold. A pull request already open is not split.
 
 ### Difficulty
 
@@ -372,7 +387,7 @@ value.
 | --- | --- | --- |
 | started | the first wait after launch returns idle | Records the row, sends the brief |
 | stage | a new stage line in the status file | Updates the row's stage and step. For an `end` line, first check its evidence ("Evidence at every step") |
-| report | `status.py read` shows the task `stopped`, or a wait returns idle and the last lines hold `REPORT:` | The stop line's `done` holds the report. `ready`: check finalize's evidence, then the verification session. `waiting`: `plan-check` ("Evidence at every step"), or what you told the lead to wait for ("Coordinate"). `decision`: add it to "Waiting on the person". `blocked`: fix what it needs or ask the person. A cut report is read from the transcript |
+| report | `status.py read` shows the task `stopped`, or a wait returns idle and the last lines hold `REPORT:` | The stop line's `done` holds the report. `ready`: check finalize's evidence, then the verification session. `waiting`: `plan-check` ("Evidence at every step"), or what you told the lead to wait for ("Coordinate"). `decision`: add it to "Waiting on the person". `blocked`: fix what it needs or ask the person. A tester's `tested`: "Verification session", "Each round" 3. A cut report is read from the transcript |
 | question | the agent asks inside the task's scope | Answer with the recommended option; only a choice that changes behavior, an interface, a schema or a core module goes to the person |
 | blocked | a dialog on screen | A permission prompt goes to the person with the agent and the command; never answer it. A trust question: the adapter page. A question dialog is closed only when the person already answered it |
 | stalled | `status.py read` marks the task `stalled` | Read the screen; move it on when it waits for a yes the brief already gave; otherwise ask what blocks it |
@@ -406,67 +421,135 @@ value.
 
 ### Verification session
 
-On `REPORT: ready`, check the claim first: run the gate with `--before-ready`
-as the lead did (the command in "Merge gate", plus `--before-ready`). When it
-blocks, send the lead what it lists. When it passes, read the free disk of
-the task's machine (`status.py read`, `disk`). When it is `low`, free space
-first, as for a `low` machine in "Watch", and start the roles after it is
-above the floor. Then, for each step of the check loop in `loop.json`
-(`redteam-review` by the red team, `test` by QA), both at once:
+One **tester** per task runs the check loop (the person's decision of
+2026-11-27): a session of its own that runs the red team, then QA, at the
+head you name (`tester.md`). It starts at the task's first ready, is
+resumed each round in the same conversation, and closes with the lead at
+merge. Finalize stays with the lead. The lead and the tester never talk to
+each other: you carry the head to the tester and the must-fix list to the
+lead.
 
-1. A clone at the lead's head, whose agent-instruction files come from the
-   base: `clone.py make --project <repo> --task <task> --agent <role>-1
-   --from <lead's clone> --ref <head SHA> --fresh --no-push --machine
-   <machine> --instructions-from <base SHA>`. The base SHA is GitHub's: `gh
-   pr view <N> --repo <repo> --json baseRefOid -q .baseRefOid`. So a change
-   the lead made to `.claude/`, `CLAUDE.md` or `AGENTS.md` cannot steer the
-   red team and QA. The gate's `tests-weakened` check names such a change.
-2. In that clone (`remote.py <machine> --cwd <clone> --` for a remote):
-   `python3 <bundle>/scripts/loop.py prompt --step <step> --task-dir <task
-   folder>`. It writes the filled prompt into `reviews/` and prints the launch
-   commands, never on the lead's profile.
-3. `status.py note --file <task folder>/status.jsonl --stage <step> --event
-   start` on the task's machine (`remote.py <machine> -- python3
-   <bundle>/scripts/status.py note ...` for a remote), then run the first
-   command in the clone in
-   the background (`terminals/prompt.md`). Exit 5: the next command. Exit
-   0 with an empty `verdict`: read the answer (`result` in the `out` file).
-   When it shows `fulltest.py: not run`, the disk was under the floor: free
-   space and start the role again (below); another profile on the same disk
-   would stop the same way. Otherwise, with no `Verdict` anywhere in it, the
-   agent stopped before its end: run the next command, once per step and
-   round. Otherwise the answer goes to the person ("no verdict" below).
-4. The summary's `verdict` is the outcome, except when QA's `fail` comes
-   only from `mismatch (script)` lines: then the outcome is `script`. Write
-   `status.py note --file <task folder>/status.jsonl --stage <step> --event
-   end --outcome <outcome> --done "<agent>: Verdict <verdict>, <its answer
-   file>"`. The `--done` text is the step's evidence. The command prints the
-   step the task goes to next. Then run `gate.py record --step <step>`
-   ("Evidence at every step").
-5. When `loop.json` has `"post_answers": true`, post the answer on the pull
-   request, on the task's machine: `python3 <bundle>/scripts/loop.py post
-   --step <step> --task-dir <task folder> --pr <N>`. It posts the saved
-   answer whole, once. The merge gate counts the role's verdict only when
-   that comment is there. On exit 1, tell the person what it printed.
+On every `REPORT: ready`, check the claim first: run the gate with
+`--before-ready` as the lead did (the command in "Merge gate", plus
+`--before-ready`). When it blocks, send the lead what it lists. When it
+passes, start the tester at the first ready, then run a round.
 
-When both print `stop`: the merge gate. When one names a work step: copy the
-findings (the `must-fix`, `should-fix` and `mismatch` lines with their
-evidence) to `<task folder>/reviews/findings-r<round>.md` and send the lead
-one line: "Read <that file> and go back to <step> with --round <next round>."
-When the two name different steps, send the earlier one in the build
-session. After the lead is ready again, start only the roles whose verdict
-check the merge gate lists as blocked.
+**Start the tester**, at the first ready:
 
-A `not run` full test because the disk was under the floor (`fulltest.py:
-not run`) is not QA's finding: free space on the machine and start QA
-again.
+1. **Machine**: choose it for this task. It needs what the scenario needs
+   (KVM for a sandbox, a Mac for what runs only on a Mac, a browser for a
+   console), disk above the floor (`status.py read`), and the bundle
+   (`bundle.py push`). It may be the lead's machine. Write why in the
+   ledger row.
+2. **Profile**: the first of `tester.profiles` in `loop.json`, one tier
+   above the lead and never the lead's profile. On a usage limit on its
+   screen, start a new tester on the next one (steps 5 and 6, then the brief
+   line). Its rounds count from 1 again, and its round 1 reads the whole
+   change.
+3. **Tester folder**: `status.py dir --project <repo> --task <task>
+   --testing` on that machine. It is outside the task folders. Write the
+   lead's `task.md` and a `brief.md` there, the way `terminals/herdr.md`
+   "Send the brief" writes a task folder. Copy nothing else: the tester reads
+   the scenario from the pull request's manual test comment and the head
+   from `pull/<N>/head`. `brief.md`, in this order:
+   1. The removal rule, as in the lead's brief.
+   2. The task: "Read `<tester folder>/task.md`.", the pull request (`#<N>`
+      of `<repo>`), its base branch, and trivial or not.
+   3. The rules the review holds the change to beyond the repository's own
+      guides: each by its path, or quoted when it is not in the repository.
+   4. "Follow `<bundle>/tester.md`." (absolute path)
+   5. The loop: `loop.py render` with the lead's brief's arguments (the same
+      `--lead`), `--machine` the tester's, and `--loop check --tester`, as
+      printed.
+   6. "This brief confirms the whole loop."
+4. **Clone**: `clone.py make --project <repo> --task <task> --agent tester
+   --pr <N> --ref <head SHA> --no-push --machine <machine>
+   --instructions-from <base SHA>`. The base SHA is GitHub's: `gh pr view
+   <N> --repo <repo> --json baseRefOid -q .baseRefOid`. The clone fetches
+   the pull request's head from origin, so the machine's checkout need not
+   have the lead's branch. The tester starts on the base's agent-instruction
+   files. From its first reset to a head, the clone holds the head's, and
+   the gate's `tests-weakened` check names a change to them.
+5. **Tab and launch**: a tab `test-<N>` in the project's workspace on that
+   machine, in the clone (`terminals/herdr.md` "Open a task tab"). A session
+   id: `uuidgen | tr A-Z a-z`. In the tab's pane: `python3
+   <bundle>/scripts/launch.py <profile> --name tester-<task> --session-id
+   <id> --task-dir <tester folder>`. Then run `clone.py trust <clone> --pane
+   <pane> --machine <machine>`, and rename the agent to `tester-<task>`.
+6. Record the tester's machine, pane, profile and session in the task's
+   ledger row, and run `log.py add --event launch --task <task> --text
+   "tester on <machine>"`.
 
-These go to the person instead, with the answer's lines: no verdict, an
-`environment` mismatch, any other `not run` test (other than `no full test
-command`), or a failure that also fails on the base. When the person says
-to merge anyway, run the merge gate with `--skip verdict:<role>` for that
-role only and log the person's words. After 3 rounds that still find
-something, stop and ask the person, with the open findings.
+**Each round**, at the head the gate just checked:
+
+1. On the lead's machine, write the red team's start line: `status.py note
+   --file <task folder>/status.jsonl --stage redteam-review --event start`
+   (for a remote machine, `remote.py <machine> -- python3
+   <bundle>/scripts/status.py note ...`).
+2. Send the tester one line, as a background command that also waits:
+   "Test #<N> at <head SHA>". At the first ready, put the brief first:
+   "Read <tester folder>/brief.md and do what it says. Then: Test #<N> at
+   <head SHA>." `<k>`, the tester's round, is the number of "Test" lines it
+   has had, this one included.
+3. The tester ends its turn with `REPORT: tested <head> — redteam
+   <verdict>, qa <verdict, or not run>, must-fix: <list>`. When its QA
+   answer shows `fulltest.py: not run`, the disk was under the floor. Free
+   space on its machine, as for a `low` machine in "Watch", and send the
+   same "Test" line again. Otherwise stamp its answers into the task folder:
+
+   ```bash
+   python3 <skill>/scripts/stamp.py --project <repo> --task <task> --head <head SHA> \
+     --profile <the tester's profile> --round <k> --session-id <its session> \
+     --from <the tester's machine> --to <the lead's machine>
+   ```
+
+   It checks that the tester's clone is at that head and that each answer
+   ends with a verdict. It writes them into `reviews/` as the red team's and
+   QA's answers (`redteam-1-<n>`, `qa-1-<n>`), with the meta the gate reads,
+   and never over a file. On exit 1, act on what it names:
+   - A clone at another head: send the tester the "Test" line again.
+   - An answer with no verdict: it goes to the person (below).
+   - The lead's profile: tell the person.
+4. For each stamped answer, the red team's first, on the lead's machine.
+   For QA, first write its start line (`--stage test --event start`).
+   1. When `loop.json` has `"post_answers": true`, post it: `python3
+      <bundle>/scripts/loop.py post --step <step> --task-dir <task folder>
+      --pr <N>`. It posts the stamped answer whole, once. The merge gate
+      counts the verdict only when that comment is there. On exit 1, tell
+      the person what it printed.
+   2. The verdict is the outcome, except when QA's `fail` comes only from
+      `mismatch (script)` lines: then the outcome is `script`. Write
+      `status.py note --file <task folder>/status.jsonl --stage <step>
+      --event end --outcome <outcome> --done "tester: Verdict <verdict>,
+      <its answer file>"`. The `--done` text is the step's evidence. The
+      command prints the step the task goes to next.
+   3. Run `gate.py record --step <step>` ("Evidence at every step").
+5. Route by what the steps printed:
+   - Both `stop` (the red team approved and QA passed this head): the merge
+     gate.
+   - A work step: copy the must-fix and mismatch lines, with their evidence,
+     to `<task folder>/reviews/findings-r<round>.md`. Send the lead one line:
+     "Read <that file> and go back to <step> with --round <next round>."
+     When two steps are named, send the earlier one in the build session.
+     The should-fix and could items stay in the stamped answers, where the
+     lead finds them for its follow-up issue.
+
+When the lead is ready again, the next round goes to the same tester. It
+reads only the change since the last head it tested, and runs QA again once
+the red team approves the new head. Treat the tester's screen like a lead's
+("Watch": a dialog, a stall, an exit). When it is gone, tell the person.
+With their yes, start it again in its tab with `--resume <its session>`.
+
+These go to the person instead, with the answer's lines:
+- no verdict;
+- an `environment` mismatch;
+- any other `not run` test (other than `no full test command`);
+- a failure that also fails on the base.
+
+When the person says to merge anyway, run the merge gate with `--skip
+verdict:<role>` for that role only and log the person's words. After 3
+rounds that still find something, stop and ask the person, with the open
+findings.
 
 ### Merge gate
 
@@ -523,9 +606,11 @@ its verdicts when the change is the same: the gate compares patches with
 
 Run `ops.after_merge` in order (`terminals/herdr.md` "Close" for agents and
 tabs; `clone.py archive`, then `clone.py remove`, for the task folder and the
-clones). The branch is deleted last: the lead's clone holds the branch's
-commits, and `clone.py remove` refuses a clone whose commits are on no
-remote. Then the project's own steps from its memory (tags, docs). Then read
+clones). The tester closes with the lead: its answers are in the task
+folder already, so its clone and tester folder go too, on its machine. The
+branch is deleted last: the lead's clone holds the branch's commits, and
+`clone.py remove` refuses a clone whose commits are on no remote. Then the
+project's own steps from its memory (tags, docs). Then read
 the task's facts: `retro.py facts --project <repo> --task <task>`. Tell the
 person, in one line, what was out of the ordinary: a step the task went back
 to, a stall, a gate block, a stop. The retro reads these facts again.
@@ -535,7 +620,8 @@ to, a stall, a gate block, a stop. The retro reads these facts again.
 When the person says to stop a task: exit its agents and close its tab
 (`terminals/herdr.md` "Close"), then `clone.py archive` and `clone.py remove
 --project <repo> --task <task> --machine <machine>`; a refusal names work
-that would be lost and goes to the person. Leave the issue and the pull request as they are unless the
+that would be lost and goes to the person. Close the tester the same way,
+on its machine (its line in `ops.after_merge`). Leave the issue and the pull request as they are unless the
 person says to close them. Log it and remove the ledger row.
 
 ## Retro
@@ -623,8 +709,8 @@ not to the ledger.
 
 ## Tasks
 
-| Task | Difficulty | PR | Machine | Tab | Pane | Profile | Model shown | Session | Clone | Task folder | Gate hash | Stage · step | Round | State | Waits on | Next action |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Task | Difficulty | PR | Machine | Tab | Pane | Profile | Model shown | Session | Clone | Task folder | Tester | Gate hash | Stage · step | Round | State | Waits on | Next action |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 ```
 
 ## Rules

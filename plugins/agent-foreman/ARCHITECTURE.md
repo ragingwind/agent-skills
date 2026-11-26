@@ -37,8 +37,9 @@ text; a loop is drawn as a sequence, with its outcomes listed under it.
 | Foreman | The project's manager: registers tasks, judges each task's difficulty, writes each task's brief, `loop.json` and gate file, watches, runs the verification session, merges (low and mid difficulty), archives and cleans up, runs the retro, talks with the person | The person | The person's harness session (Claude Code) |
 | Lead | Owns one task: runs its build session in its own clone, starts its pair, runs the gate before it marks the pull request ready, reports | Foreman | The first pane of the task's tab |
 | Pair | Reviews the lead's diff (step `review`) and the fixes (step `recheck`) | Lead | A prompt-mode run (`launch.py --print --role pair`) in its own clone at the lead's head |
-| Red team | Tries to break the change (step `redteam-review`) | Foreman | A prompt-mode run in its own clone at the lead's head |
-| QA | Runs the full tests and the user scenario test (step `test`) | Foreman | A prompt-mode run in its own clone at the lead's head |
+| Red team | Tries to break the change (step `redteam-review`) | Foreman | Run by the task's tester |
+| QA | Runs the full tests and the user scenario test (step `test`), once the red team approves the same head | Foreman | Run by the task's tester |
+| Tester | Runs the check loop for one task: the red team, then QA, each round at the head the foreman names; writes both answers in its tester folder (`tester.md`) | Foreman | A pane of its own (tab `test-<N>`) on a machine the foreman picks, in its own clone from the pull request's head; resumed each round, closed at merge |
 | Helper, audit lead, scenario agent | The epic loop's roles | Foreman | A pane |
 | Person | Decisions that need approval, high-difficulty merges, blocked removals, permission prompts, findings no script can settle | — | — |
 
@@ -54,8 +55,8 @@ text; a loop is drawn as a sequence, with its outcomes listed under it.
    │                │            gate.py record       │
    │                │ coordinate                      │ review, recheck ─▶ PAIR
    │                │◀────────────────── REPORT ready │
-   │                │ verify-session ─────────────────────────────────────▶ RED TEAM ∥ QA
-   │                │◀──────────────────────────────────────────── verdicts
+   │                │ verify-session ─────────────────────────────────────▶ TESTER: RED TEAM, then QA
+   │                │◀─────────────────────────────── stamp.py ◀───── answers
    │                │ sent back? ── findings-r<N>.md ▶│ round N+1
    │                │ merge-gate  gate.py run --sha   │
    │                │ merge                           │
@@ -83,9 +84,9 @@ profile's). The pair, the red team and QA never run on the lead's profile.
 ├──────────────────────────────────────────────────────────────────┤
 │ terminal layer: herdr, prompt mode     (later: tmux, ghostty)    │
 ├───────────────────────────────────┬──────────────┬───────────────┤
-│ tab: one task's session           │ tab 2        │ ...           │
-│ pane 1: lead                      │              │               │
-│ prompt runs: pair, red team, QA   │              │               │
+│ tab: one task's session           │ tab test-<N> │ ...           │
+│ pane 1: lead                      │ pane: tester │               │
+│ prompt runs: pair                 │              │               │
 ├───────────────────────────────────┴──────────────┴───────────────┤
 │ agent adapter: claude                  (later: other kinds)      │
 └──────────────────────────────────────────────────────────────────┘
@@ -270,16 +271,19 @@ again without reading the diff.
 ### Check loop: the verification session (foreman)
 
 ```text
- CHECK LOOP · the verification session, both steps at once
- FOREMAN                                  RED TEAM       QA     status.py note --file
-  │                                           │           │           │
-  │ gate --before-ready on the lead's claim   │           │           │
-  │ redteam-review  clone at head, prompt ───▶│           │           │
-  │ test            clone at head, prompt ───────────────▶│           │
-  │◀──────────────────────── answer, Verdict ─│           │           │
-  │◀──────────────────────────────────── answer, Verdict ─│           │
-  │                 ─────────────────────────────────────────────────▶│ end, once per step
-  │                                           │           │           │
+ CHECK LOOP · the verification session: the task's tester, the red team first, then QA
+ FOREMAN                                       TESTER                      status.py note --file
+  │                                               │                             │
+  │ gate --before-ready on the lead's claim       │                             │
+  │ "Test #<N> at <head>" ───────────────────────▶│ fetch, reset to the head    │
+  │ redteam-review                                │ red team: only the change   │
+  │                                               │ since its last head         │
+  │ test                                          │ QA, only when the red team  │
+  │                                               │ approved this head          │
+  │◀──────────────────────── REPORT: tested <head>│                             │
+  │ stamp.py: its answers into reviews/           │                             │
+  │ loop.py post, each step's end line ────────────────────────────────────────▶│ end, once per step
+  │                                               │                             │
  outcomes:
    redteam-review ─approved─▶ stop     redteam-review ─changes─▶ build
    test ─pass─▶ stop                   test ─fail─▶ build
@@ -288,15 +292,21 @@ again without reading the diff.
 ```
 
 - On `REPORT: ready` the foreman runs the gate with `--before-ready` on the
-  lead's claim, then starts both steps at once, each in its own clone at the
-  lead's head, through `loop.py prompt` (models other than the lead's).
+  lead's claim. At the first ready it starts the task's tester (`tester.md`)
+  on a machine it picks, in a clone from the pull request's head (`clone.py
+  make --pr`), one tier above the lead's profile. Each round it sends the
+  tester the head; the tester runs the red team, and QA once the red team
+  approves that head, and writes both answers in its tester folder.
+- The foreman stamps them into the task folder as the red team's and QA's
+  (`stamp.py`), posts them (`loop.py post`) and writes each step's end line,
+  so the gate reads them as any role's answers.
 - The answer's verdict is the outcome, except when QA's `fail` comes only
   from `mismatch (script)` lines: then it is `script`.
 - When both steps end in `stop`: the merge gate. When one names a work step:
-  the foreman copies the findings to `reviews/findings-r<round>.md` and sends
-  the lead back to that step with the next round (two different steps: the
-  earlier one). After the lead is ready again, only the roles whose verdict
-  check still blocks run again.
+  the foreman copies the must-fix and mismatch lines to
+  `reviews/findings-r<round>.md` and sends the lead back to that step with
+  the next round (two different steps: the earlier one). The lead and the
+  tester never talk to each other.
 - To the person instead: no verdict, an `environment` mismatch, a `not run`
   test, a failure that also fails on the base, or 3 rounds that still find
   something. When the person says to merge anyway, the merge gate runs with
@@ -318,6 +328,9 @@ None of them runs on the lead's profile (section 4).
   clone, whose push to origin fails (`clone.py make --no-push`), and the
   gate's check that each verdict is at the head commit keep their writes from
   reaching the pull request. A role agent never starts other agents.
+- The tester keeps its edit tools: it writes its answers itself, in its
+  tester folder. The same hold on it: a clone that cannot push, and answers
+  that count only at the head, stamped by the foreman.
 
 ### How a step moves
 
@@ -491,12 +504,13 @@ Pass conditions are code, not prose (`scripts/gate.py`).
   `&&` or `;`, were all refused. The deny does not match a merge through
   `gh api`, `gh -R <repo> pr merge` or a script. The merge check above
   catches those merges.
-- The red team's clone and QA's clone restore the agent-instruction files as
-  GitHub's base commit has them (`clone.py make --instructions-from`). So a
-  change to `.claude/`, `CLAUDE.md` or `AGENTS.md` cannot change the
-  instructions that those agents read. The lead makes the pair's clone
-  itself, so no other agent checks that the pair's files were restored. In
-  either case, `tests-weakened` names the change for the merge gate.
+- The tester's clone starts with the agent-instruction files as GitHub's
+  base commit has them (`clone.py make --instructions-from`), so the tester
+  starts on the base's `.claude/`, `CLAUDE.md` and `AGENTS.md`. From its first
+  reset to a head, the clone holds the head's files. The lead makes the
+  pair's clone itself, so no other agent checks that the pair's files were
+  restored. In every case, `tests-weakened` names a change to them for the
+  merge gate.
 - Known limit: the lead can write in its own task folder, so no script stops
   it from writing a fake answer file into `reviews/`.
 
@@ -517,12 +531,15 @@ Pass conditions are code, not prose (`scripts/gate.py`).
     every step (`status.py note`, section 6), `progress` lines during a long
     one, and a `stop` line at a decision or when blocked. The foreman writes
     the verification session's lines with `--file`.
+  - The tester writes its own lines into its tester folder's `status.jsonl`;
+    `status.py read` shows them as the task's testing session.
 - **The foreman** runs `status.py read` on every check (one SSH call per
   machine). No line for `ops.stall_minutes` (30) is a stall, unless the task
   is stopped: its last stage line is a `stop` line or an `end` line that
   leads to `stop`.
 - **`REPORT:`** at the end of a turn only at stop points: ready, a decision
-  for the person, blocked, waiting (for the foreman's `plan-check`).
+  for the person, blocked, waiting (for the foreman's `plan-check`). The
+  tester reports `tested` at the end of each round.
 - **Prompt-mode runs** of a role leave three files in `reviews/`:
   `<agent>-<n>.prompt.md` (from `loop.py prompt`), `<agent>-<n>.json` (the
   JSON result: `result`, `session_id`, `total_cost_usd`,
@@ -535,8 +552,10 @@ Pass conditions are code, not prose (`scripts/gate.py`).
   `~/.cache/agent-foreman/work/<project>/<task>/<agent>`. It starts inside
   that clone, never in a shared checkout.
   - The lead's clone comes from the project's checkout on that machine. The
-    pair's, the red team's, QA's and the lead's scenario clone come from the
-    lead's clone at its head, with `--fresh --no-push`. Either way `origin`
+    pair's and the lead's scenario clone come from the lead's clone at its
+    head, with `--fresh --no-push`. The tester's comes from its machine's
+    checkout, with the pull request's head fetched from origin (`--pr`),
+    `--no-push`. Either way `origin`
     is then set to the source's GitHub URL and fetched: without it `gh` fails
     ("none of the git remotes … point to a known GitHub host", checked
     2026-11-13).
@@ -585,9 +604,15 @@ Pass conditions are code, not prose (`scripts/gate.py`).
   | `scenario.md` | lead | The user scenario: steps, Agent blocks, a closing verdict |
   | `handoff.md` | lead | The pull request body |
   | `status.jsonl` | lead, foreman, hooks | Section 9 |
-  | `reviews/` | `launch.py`, foreman | Each role run's prompt, answer and meta; the foreman's `findings-r<round>.md` |
+  | `reviews/` | `launch.py`, `stamp.py`, foreman | Each role run's prompt, answer and meta; the red team's and QA's answers stamped from the tester's; the foreman's `findings-r<round>.md` |
   | `gates.jsonl` | `gate.py run` | Each gate run: the head, whether it passed, what blocked and what warned |
 
+- **Tester folder**, on the tester's machine:
+  `~/.local/state/agent-foreman/testing/<owner>-<repo>/<task>/` (`status.py
+  dir --testing`): `brief.md` and `task.md` from the foreman, the tester's
+  answers in `reviews/`, and its `status.jsonl`. It is outside the task
+  folders, so `status.py read` does not take it for a second copy of the
+  task. Its answers reach the task folder only through `stamp.py`.
 - After the merge, `clone.py archive` copies the task folder to the
   foreman's project folder (`projects/<owner>-<repo>/tasks/<task>`) and checks
   that every file arrived; `clone.py remove` then removes it with the clones.
