@@ -144,6 +144,14 @@ Exit 0: `gh pr ready <N>`, end the finalize step with `done`, and report
 `ready`. Exit 6: fix what it lists under `blocked` and run it again. A check
 you think is wrong goes in your report.
 
+**Size.** The gate's `size` check counts the change's added lines, without
+lockfiles and the files the base marks `linguist-generated`, against
+`max_lines` in loop.json; in a new task it blocks over that budget. Watch
+it in build (`git diff --numstat origin/<base>`). When build passes the
+budget, stop at a working, tested cut: the rows done so far, each tested.
+Move the rest into a next task, a stack layer or a new issue, and write
+which in `plan.md`'s Decisions and handoff.md's Follow-ups.
+
 ## When the verification session finds something
 
 The foreman sends you a file with the red team's and QA's findings, the step

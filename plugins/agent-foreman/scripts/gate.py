@@ -69,7 +69,12 @@ Checks (each may say "severity": "warn" to report without blocking):
                   (`.claude/`, `CLAUDE.md`, `AGENTS.md`), except the kinds in
                   "allow" (removed-test, skip-marker, ci-edit, coverage,
                   agent-files)
-  size            additions + deletions at most "max_lines"
+  size            added lines at most "max_lines": the pull request's
+                  additions, without lockfiles (LOCKFILES) and without the
+                  files that the base commit's .gitattributes mark
+                  `linguist-generated` (with --cwd); its severity comes from
+                  the task's loop.json ("size_severity", "warn" for a task
+                  from before it)
   ready           the pull request is no longer a draft
   command         "run" exits 0 in the clone (--cwd); it gets AF_REPO, AF_PR,
                   AF_TASK, AF_TASK_DIR, AF_BASE, AF_BASE_SHA (the base
@@ -86,7 +91,13 @@ check in the report and in --skip. An unnamed command check is the project's
 full tests (`tests.full`), named `command`. It has "full": true and runs
 through fulltest.py: one full test run at a time on the machine, and none
 when the disk has less than "min_free_gb" free (exit 75, `fulltest.py: not
-run`).
+run`). Its "answer" holds a verdict check's terms (role, accept,
+not_profiles, posted), the role whose check-loop step runs the `full` skill
+(QA): when that role's latest answer passes those terms at the exact head
+SHA and lists `- ran: <run> — exit 0` (also as fulltest.py runs it, the way
+QA's prompt names it), the check passes without running the command again,
+and its evidence names the answer file. Forging it takes
+what forging that role's verdict check takes.
 
 --before-ready skips `ready` and every check marked "at": "merge": the lead
 runs the gate before the verification session. --skip names checks to leave
@@ -105,6 +116,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -114,6 +126,10 @@ TEST_PATHS = ["**/tests/**", "**/test/**", "**/__tests__/**", "**/*_test.*", "**
 CI_PATHS = ["**/.github/workflows/**", "**/.gitlab-ci.yml", "**/Jenkinsfile", "**/.circleci/**",
             "**/azure-pipelines.yml"]
 AGENT_PATHS = ["**/.claude/**", "**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md"]
+# A package manager writes these; the size budget counts the lines a person writes (loop-rules.md rule 6).
+LOCKFILES = ["*.lock", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "go.sum", "bun.lockb",
+             "packages.lock.json", "gradle.lockfile"]
+RAN = re.compile(r"^-\s+ran:\s+`?(.+?)`?\s+[—–-]+\s+exit\s+0\s*$")
 SKIP_MARKERS = re.compile(r"@pytest\.mark\.(skip|xfail)|\b(it|test|describe)\.skip\(|\bx(it|describe)\(|"
                           r"\bt\.Skip(Now|f)?\(|@Ignore\b|@Disabled\b|#\[ignore\]|unittest\.skip|\.only\(")
 COVERAGE = re.compile(r"fail_under|fail-under|cov-fail-under|coverageThreshold|min(imum)?_coverage", re.I)
@@ -375,6 +391,11 @@ def check_base_fresh(pr, spec, ctx):
 def latest_answers(task_dir, role):
     """(agent, meta, answer text) of each agent of a role: its latest run in the
     task folder's reviews/ (launch.py --print --role writes `<out>.meta.json`)."""
+    return [(agent, meta, text) for agent, meta, _, text in latest_runs(task_dir, role)]
+
+
+def latest_runs(task_dir, role):
+    """latest_answers, with each answer's file after its meta."""
     by_agent = {}
     for meta_file in glob.glob(os.path.join(task_dir, "reviews", "*.meta.json")):
         try:
@@ -395,32 +416,44 @@ def latest_answers(task_dir, role):
                 text = str(json.load(f).get("result") or "")
         except (OSError, ValueError, AttributeError):
             pass
-        out.append((agent, meta, text))
+        out.append((agent, meta, answer_file, text))
     return out
+
+
+def accepted_answers(pr, spec, ctx, exact=False):
+    """(each accepted answer as (agent, meta, answer file, text), what was
+    seen) for a verdict check's terms: the role's latest answers that end with
+    a verdict in "accept", at the head, on a profile not in "not_profiles",
+    from a run that finished, and on the pull request when "posted". With
+    exact, only at the head SHA itself, not at an earlier one whose change is
+    the same."""
+    accept = [a.lower() for a in spec.get("accept", ["approved"])]
+    banned = set(spec.get("not_profiles", []))
+    comments = [c.get("body") or "" for c in pr.get("comments") or [] if isinstance(c, dict)]
+    good, seen = [], []
+    for agent, meta, answer_file, text in latest_runs(ctx["task_dir"], spec["role"]):
+        verdict = last_verdict(text)
+        head = meta.get("head") or ""
+        at_head = bool(head) and (same_sha(head, pr["headRefOid"]) or bool(
+            not exact and ctx.get("cwd") and same_change(ctx["cwd"], pr["baseRefName"], head, pr["headRefOid"])))
+        posted = not spec.get("posted") or any(
+            same_body(c, answer_comment(spec["role"], agent, pr.get("number"), meta, text)) for c in comments)
+        if (verdict in accept and at_head and meta.get("profile") not in banned and meta.get("ok") is True
+                and posted):
+            good.append((agent, meta, answer_file, text))
+        seen.append(f"{agent} {meta.get('profile')} {head[:7] or '?'} {verdict or 'no verdict'}"
+                    + ("" if meta.get("ok") is True else " (the run failed)")
+                    + ("" if meta.get("profile") not in banned else " (the lead's profile)")
+                    + ("" if posted else " (not on the pull request as saved)"))
+    return good, seen
 
 
 def check_verdict(pr, spec, ctx):
     if not ctx.get("task_dir"):
         return False, "needs --task-dir"
-    accept = [a.lower() for a in spec.get("accept", ["approved"])]
-    banned = set(spec.get("not_profiles", []))
-    comments = [c.get("body") or "" for c in pr.get("comments") or [] if isinstance(c, dict)]
-    good, seen = 0, []
-    for agent, meta, text in latest_answers(ctx["task_dir"], spec["role"]):
-        verdict = last_verdict(text)
-        head = meta.get("head") or ""
-        at_head = bool(head) and (same_sha(head, pr["headRefOid"]) or bool(
-            ctx.get("cwd") and same_change(ctx["cwd"], pr["baseRefName"], head, pr["headRefOid"])))
-        posted = not spec.get("posted") or any(
-            same_body(c, answer_comment(spec["role"], agent, pr.get("number"), meta, text)) for c in comments)
-        ok = (verdict in accept and at_head and meta.get("profile") not in banned and meta.get("ok") is True
-              and posted)
-        good += ok
-        seen.append(f"{agent} {meta.get('profile')} {head[:7] or '?'} {verdict or 'no verdict'}"
-                    + ("" if meta.get("ok") is True else " (the run failed)")
-                    + ("" if meta.get("profile") not in banned else " (the lead's profile)")
-                    + ("" if posted else " (not on the pull request as saved)"))
-    return good > 0, f"{good} accepted {spec['role']} answer(s) at the head; seen: {', '.join(seen) or 'none'}"
+    good, seen = accepted_answers(pr, spec, ctx)
+    return bool(good), (f"{len(good)} accepted {spec['role']} answer(s) at the head; "
+                        f"seen: {', '.join(seen) or 'none'}")
 
 
 def check_tests_weakened(pr, spec, ctx):
@@ -443,10 +476,53 @@ def check_tests_weakened(pr, spec, ctx):
     return not found, "; ".join(found) if found else "none found"
 
 
+def generated_at_base(cwd, sha, paths):
+    """The paths that the base commit's .gitattributes mark
+    `linguist-generated`, or None when the clone cannot read them. Only the
+    base's attributes count: a fresh git dir that borrows the clone's objects
+    reads them, so a change cannot mark its own code as generated, in the
+    tree or in the clone's .git/info/attributes or config."""
+    if not re.fullmatch(r"[0-9a-f]{7,64}", sha or ""):
+        return None
+    if subprocess.run(["git", "-C", cwd, "cat-file", "-e", f"{sha}^{{commit}}"], capture_output=True).returncode:
+        subprocess.run(["git", "-C", cwd, "fetch", "--quiet", "origin", sha], capture_output=True)
+    objects = subprocess.run(["git", "-C", cwd, "rev-parse", "--git-path", "objects"], capture_output=True, text=True)
+    if objects.returncode != 0:
+        return None
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
+               "GIT_INDEX_FILE": os.path.join(tmp, "index")}
+
+        def git(*args, stdin=None):
+            return subprocess.run(["git", f"--git-dir={tmp}", *args], capture_output=True, text=True, env=env,
+                                  input=stdin)
+        git("init", "-q", "--bare", "--template=", tmp)
+        with open(os.path.join(tmp, "objects", "info", "alternates"), "w", encoding="utf-8") as f:
+            f.write(os.path.abspath(os.path.join(cwd, objects.stdout.strip())) + "\n")
+        if git("read-tree", sha).returncode != 0:
+            return None
+        out = git("check-attr", "--cached", "-z", "--stdin", "linguist-generated", stdin="".join(p + "\0" for p in paths))
+    if out.returncode != 0:
+        return None
+    fields = out.stdout.split("\0")
+    return {fields[i] for i in range(0, len(fields) - 2, 3) if fields[i + 2] in ("set", "true")}
+
+
 def check_size(pr, spec, ctx):
-    lines = pr.get("additions", 0) + pr.get("deletions", 0)
+    files = [f for f in pr.get("files") or [] if isinstance(f, dict) and f.get("filename")]
+    generated = set()
+    if files:
+        generated = generated_at_base(ctx["cwd"], pr.get("baseRefOid"), [f["filename"] for f in files]) \
+            if ctx.get("cwd") else None
+    left_out = [f for f in files if any(matches(f["filename"], p) for p in LOCKFILES)
+                or f["filename"] in (generated or ())]
+    lines = pr.get("additions", 0) - sum(f.get("additions") or 0 for f in left_out)
     limit = spec.get("max_lines", 400)
-    return lines <= limit, f"{lines} changed lines (limit {limit})"
+    return lines <= limit, (f"{lines} added lines (limit {limit}), without {len(left_out)} lockfile(s) and "
+                            f"generated file(s)" + ("" if generated is not None else
+                                                    "; the base's linguist-generated files unknown (no --cwd or "
+                                                    "no base commit), so all of them counted"))
 
 
 def check_ready(pr, spec, ctx):
@@ -618,7 +694,45 @@ def _handoff_problems(handoff):
     return [f"handoff.md lacks {n}" for n in HANDOFF_SECTIONS if section(handoff, n) is None]
 
 
+def ran_commands(text):
+    """The commands an answer lists as `- ran: <command> — exit 0`. QA's
+    prompt names the full tests through fulltest.py (`python3 .../fulltest.py
+    --min-free-gb N -- '<run>'`), and QA writes them as named, so a command
+    run that way also counts as the command after its `--`."""
+    out = set()
+    for m in (RAN.match(line.strip()) for line in str(text).splitlines()):
+        if not m:
+            continue
+        out.add(m.group(1).strip())
+        try:
+            words = shlex.split(m.group(1))
+        except ValueError:
+            continue
+        wrapped = (len(words) > 2 and os.path.basename(words[0]).startswith("python")
+                   and os.path.basename(words[1]) == "fulltest.py" and "--" in words[2:])
+        if wrapped:
+            out.add(" ".join(words[words.index("--") + 1:]))
+    return out
+
+
+def ran_in_answer(pr, spec, ctx):
+    """Why a full command check needs no run, or None: an answer that its
+    "answer" terms accept at the exact head lists `- ran: <run> — exit 0`."""
+    terms = spec.get("answer")
+    if not (spec.get("full") and isinstance(terms, dict) and ctx.get("task_dir")):
+        return None
+    for agent, meta, answer_file, text in accepted_answers(pr, terms, ctx, exact=True)[0]:
+        if spec["run"].strip() in ran_commands(text):
+            return (f"not run again: {agent} ran it at {pr['headRefOid'][:7]} with exit 0, on "
+                    f"{meta.get('profile')}, and its answer {os.path.relpath(answer_file, ctx['task_dir'])} "
+                    f"says Verdict: {last_verdict(text)}")
+    return None
+
+
 def check_command(pr, spec, ctx):
+    passed = ran_in_answer(pr, spec, ctx)
+    if passed:
+        return True, passed
     if not ctx.get("cwd"):
         return False, "needs --cwd"
     env = {**os.environ, "AF_REPO": ctx.get("repo") or "", "AF_PR": str(pr.get("number") or ""),
@@ -687,6 +801,9 @@ def validate_gate(gate):
             problems.append(f"gate: verdict check {i + 1} needs a role")
         elif name == "command" and bool(spec.get("run")) == bool(spec.get("from_base")):
             problems.append(f"gate: command check {i + 1} needs run or from_base, not both")
+        elif name == "command" and "answer" in spec and not (
+                spec.get("full") and isinstance(spec["answer"], dict) and spec["answer"].get("role")):
+            problems.append(f"gate: command check {i + 1} takes an answer only with full, and it needs a role")
         elif name == "loop-file" and not spec.get("sha256"):
             problems.append(f"gate: loop-file check {i + 1} needs sha256")
         if isinstance(spec, dict):
@@ -765,8 +882,10 @@ def template(task_loop, loop_sha=None, pr=None):
     ready, the verification session's at merge), each refusing the lead's
     profile, the full tests, the project's own checks, and the standing
     checks."""
+    import loop as loops
     lead = task_loop.get("lead_profile")
     roles = task_loop.get("roles", {})
+    verdicts = {}
     work = task_loop["work"]
     last_stage = work[-1]["stage"]
     checks = [{"check": "pr-open"}]
@@ -783,12 +902,19 @@ def template(task_loop, loop_sha=None, pr=None):
                 if task_loop.get("post_answers"):
                     spec["posted"] = True
             checks.append(spec)
+            verdicts[role] = spec
     if task_loop.get("tests_full"):
-        checks.append({"check": "command", "run": task_loop["tests_full"], "full": True,
-                       "min_free_gb": task_loop.get("disk_min_free_gb", 0)})
+        full = {"check": "command", "run": task_loop["tests_full"], "full": True,
+                "min_free_gb": task_loop.get("disk_min_free_gb", 0)}
+        tester = next((s["actor"] for s in task_loop["check"] if s["actor"] in verdicts
+                       and "full" in loops.recorded_defaults(s.get("skills", []))), None)
+        if tester:
+            full["answer"] = {k: v for k, v in verdicts[tester].items() if k not in ("check", "at")}
+        checks.append(full)
     checks += [dict(spec) for spec in task_loop.get("gate") or []]
     checks += [{"check": "tests-weakened", "allow": []},
-               {"check": "size", "max_lines": task_loop.get("max_lines", 400), "severity": "warn"},
+               {"check": "size", "max_lines": task_loop.get("max_lines", 400),
+                "severity": task_loop.get("size_severity", "warn")},
                {"check": "ready"}]
     return {"repo": task_loop["repo"], "pr": pr, "task": task_loop["task"], "difficulty": task_loop["difficulty"],
             "trivial": task_loop["trivial"], "checks": checks}
@@ -886,7 +1012,8 @@ def main(argv):
             append_gate_run(task_dir, report, args.before_ready, skip, sha_checked=True)
         return EXIT_GATE_FAILED
     cwd = os.path.expanduser(args.cwd) if args.cwd else None
-    comments = any(s.get("posted") for s in gate["checks"] if isinstance(s, dict))
+    comments = any(s.get("posted") or (isinstance(s.get("answer"), dict) and s["answer"].get("posted"))
+                   for s in gate["checks"] if isinstance(s, dict))
     report = evaluate(fetch(gate["repo"], gate["pr"], comments), gate, cwd, skip, task_dir, args.before_ready)
     print(json.dumps(report, indent=2, ensure_ascii=False))
     if task_dir:
