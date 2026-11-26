@@ -20,18 +20,27 @@ Prints one JSON object:
   tasks       per task: difficulty, trivial, the last round, minutes per
               step, each time it went back (from a step to an earlier one),
               its stop lines, its review findings by role, its gate runs and
-              what blocked, and its log events
+              what blocked, its log events, and its idle time (below)
   steps       per step over the tasks: how many ran it, total and median
               minutes, how often a task went back to it and from where, and
               the skills it used
   roles       per role: its verdicts, and its findings by severity with
               their lines and tasks
   gate        per check: how many runs it blocked and warned in
+  idle        the tasks' idle time, summed
   events      the log events of those tasks, counted (stall, exited, ...)
   open        the open items the last setup left (the `setup` log event)
   previous    the last retro (the `retro` log event): what it changed and
               the facts it expected to change
   unreadable  files or lines that could not be read
+
+Idle time is the time when none of the task's steps was running, between
+its first step line and its last. A step runs from its `start` (or a
+`progress` line) to its `end` or `stop`; a work-loop step that starts ends
+any other work-loop step left open, since the lead runs one at a time.
+Each gap goes to the line before it: `end <step> (<outcome>)`, or `stop
+<step> (<kind>)` with the kind its REPORT names (ready, decision, blocked,
+waiting). `idle` holds `minutes`, `span_minutes` and `by_event`.
 
 Exit codes: 2 = bad arguments.
 """
@@ -55,6 +64,7 @@ LINE_MAX = 200
 FINDING = re.compile(r"^(?:[-*+]|\d+[.)])?\s*[*_]*(must-fix|should-fix|could)[*_]*\s*:\s*(.*)$|"
                      r"^(?:[-*+]|\d+[.)])?\s*[*_]*(mismatch)[*_]*\s*\(", re.I)
 NO_FINDING = {"", "none", "none.", "n/a", "-"}
+STOP_KIND = re.compile(r"^(?:REPORT:\s*)?(ready|decision|blocked|waiting)\b", re.I)
 
 
 def since_time(text):
@@ -151,6 +161,39 @@ def _timeline(rows, order):
     return minutes, back, stops, last_round
 
 
+def _gap_label(row):
+    """What a gap after this end or stop line waited on."""
+    step = _step(row)
+    if row["event"] == "end":
+        return f"end {step} ({row['outcome']})" if isinstance(row.get("outcome"), str) else f"end {step}"
+    m = STOP_KIND.match(str(row.get("done") or "").strip())
+    kind = m.group(1).lower() if m else ("blocked" if row.get("blocked") else "other")
+    return f"stop {step} ({kind})"
+
+
+def _idle(rows, work):
+    """The task's idle time (module docstring), from its step lines in order."""
+    timed = [(at, r) for at, r in ((parse_time(r.get("time")), r) for r in rows) if at is not None]
+    by_event, running, before = defaultdict(float), set(), None
+    for at, r in timed:
+        if before is not None and not running and at > before[0]:
+            by_event[before[1]] += (at - before[0]) / 60
+        step = _step(r)
+        if r["event"] in ("start", "progress"):
+            if r["event"] == "start" and step in work:
+                running -= work
+            running.add(step)
+        else:
+            running.discard(step)
+            before = (at, _gap_label(r))
+        if running:
+            before = None
+    times = [at for at, _ in timed]
+    return {"minutes": round(sum(by_event.values()), 1),
+            "span_minutes": round((max(times) - min(times)) / 60, 1) if times else 0,
+            "by_event": {k: round(v, 1) for k, v in sorted(by_event.items(), key=lambda kv: -kv[1])}}
+
+
 def _reviews(folder, unreadable):
     reviews = defaultdict(lambda: {"runs": 0, "verdicts": Counter(), "findings": []})
     for meta_file in sorted(glob.glob(os.path.join(folder, "reviews", "*.meta.json"))):
@@ -191,6 +234,8 @@ def task_facts(folder, events, unreadable):
     reviews = _reviews(folder, unreadable)
     gates = _gate_runs(folder, unreadable)
     times = [t for t in (parse_time(r.get("time")) for r in rows) if t is not None]
+    work = {s["id"] for s in (loop.get("work") if isinstance(loop.get("work"), list) else [])
+            if isinstance(s, dict) and isinstance(s.get("id"), str)}
     return {"task": task, "first": min(times) if times else None, "last": max(times) if times else None,
             "difficulty": loop.get("difficulty"), "trivial": loop.get("trivial"),
             "round": last_round, "order": order,
@@ -203,7 +248,8 @@ def task_facts(folder, events, unreadable):
                             "lines": [line for _, line in v["findings"]]} for k, v in reviews.items()},
             "gate_runs": [{"before_ready": g.get("before_ready"), "pass": g.get("pass"),
                            "blocked": g.get("blocked", []), "warned": g.get("warned", [])} for g in gates],
-            "events": dict(Counter(e.get("event") for e in events if e.get("task") == task))}
+            "events": dict(Counter(e.get("event") for e in events if e.get("task") == task)),
+            "idle": _idle(rows, work)}
 
 
 def facts(repo, tasks=None, since=None):
@@ -228,7 +274,11 @@ def facts(repo, tasks=None, since=None):
     roles = defaultdict(lambda: {"verdicts": Counter(), "findings": Counter(), "lines": []})
     gate = defaultdict(lambda: {"blocked": 0, "warned": 0})
     events = Counter()
+    idle = {"minutes": 0.0, "span_minutes": 0.0, "by_event": Counter()}
     for t in per_task:
+        for key in ("minutes", "span_minutes"):
+            idle[key] += t["idle"][key]
+        idle["by_event"].update(t["idle"]["by_event"])
         for step in t["order"]:
             s = steps[step]
             s["skills"].update(t["skills"].get(step, []))
@@ -263,6 +313,8 @@ def facts(repo, tasks=None, since=None):
         "roles": {k: {"verdicts": dict(v["verdicts"]), "findings": dict(v["findings"]), "lines": v["lines"]}
                   for k, v in roles.items()},
         "gate": dict(gate),
+        "idle": {"minutes": round(idle["minutes"], 1), "span_minutes": round(idle["span_minutes"], 1),
+                 "by_event": {k: round(v, 1) for k, v in idle["by_event"].most_common()}},
         "events": dict(events),
         "open": last_setup["data"]["open"] if last_setup else [],
         "previous": {k: last_retro.get(k) for k in ("time", "text", "data")} if last_retro else None,
