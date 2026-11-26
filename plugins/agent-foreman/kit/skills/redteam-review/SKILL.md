@@ -49,11 +49,12 @@ You write no file; you have no edit tools. launch.py saves your final answer, wi
 Verdict: changes
 ```
 
-- `must-fix`: wrong behavior, a done-when not met, a weakened test, a security hole, lost data, a broken guide rule.
-- `should-fix`: a real weakness that is not yet wrong behavior: an untested path, a duplicated helper, a change outside the request, needless repeated work.
+- `must-fix`, and nothing else: a done-when of task.md that is not met; a behavior bug that a user or a caller would hit; a security or isolation hole; lost data; a weakened test; a rule of the project's guides broken in code this change adds.
+- `should-fix`: a real weakness that is no must-fix: an untested path, a duplicated helper, a change outside the request, needless repeated work.
 - `could`: optional.
 - An old defect starts its text with `old defect:`. It is `could`, unless this change makes it worse.
-- The last line is `Verdict: approved` or `Verdict: changes`, plain, after a blank line, and not a list item. Write `changes` only when a must-fix or should-fix exists.
+- A finding outside task.md's done-when and its epic's goal (when task.md names an epic) starts its text with `outside the goal:`. It is a `should-fix` or a `could`, whatever its weight, unless it is a security hole or lost data. Examples: wording in docs, a refactor of code the change does not touch, splitting a test file, polishing a comment.
+- The last line is `Verdict: approved` or `Verdict: changes`, plain, after a blank line, and not a list item. Write `changes` only when a must-fix exists. Should-fix and could items are listed and never make `changes`: with no must-fix, approve.
 
 ## Rules
 

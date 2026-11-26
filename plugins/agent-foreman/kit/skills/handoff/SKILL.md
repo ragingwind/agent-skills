@@ -15,14 +15,15 @@ description: >-
 1. **Rebase.** Run `git fetch origin`, then `git rebase origin/<base>`. The brief names the base. A conflict: fix it in the files, `git add` them, run `git rebase --continue`, and see Flow.
 2. **Write `$AF_TASK_DIR/handoff.md`** (the task folder) in the shape under Record.
    1. Purpose: what the change does and why, in two to four sentences, from task.md. If the task comes from an issue, end with `Closes #<number>`.
-   2. Decisions: each line of plan.md `## Decisions`, and each review finding left unfixed, with its reason.
+   2. Decisions: each line of plan.md `## Decisions`, and each must-fix left unfixed, with its reason.
    3. Tests: one line for each check that ran, with its command and result: the item tests, the tests near the change, the smoke test, and the scenario script. The raw output stays in plan.md and scenario.md.
    4. Not touched: what a reader might expect this change to touch, but it does not, and why. For example: related code, the same bug in another place, a file out of scope.
-   5. Follow-ups: keep the lines already there. Add large clean-ups, `could` findings left open, and problems seen outside the task.
+   5. Follow-ups: keep the lines already there. Add large clean-ups, problems seen outside the task, and the link to the pull request's follow-up issue, which holds the should-fix and could findings left open (`loop.md` "Follow-up issue").
 3. **Push and open a draft pull request.**
    1. `git push -u origin <branch>`. If the branch was pushed before a rebase, use `git push --force-with-lease origin <branch>`.
    2. When there is no pull request yet, open a draft: `gh pr create --draft --base <base> --head <branch> --title "<short imperative title>" --body-file "$AF_TASK_DIR/handoff.md"`. A pull request may already exist, from an earlier round or from a skill in an earlier step. In that case, set its body: `gh pr edit <number> --body-file "$AF_TASK_DIR/handoff.md"`. When it is not a draft, make it one again: `gh pr ready <number> --undo`. Ready must mean that the gate passed.
    3. Check it: `gh pr view <number> --json url,headRefOid`. `headRefOid` must equal `git rev-parse HEAD`.
+   4. When a should-fix or could finding is left open, open or update the follow-up issue now that the pull request has its number (`loop.md` "Follow-up issue"). Put its link under `## Follow-ups` and set the body again: `gh pr edit <number> --body-file "$AF_TASK_DIR/handoff.md"`.
 4. **Wait for the checks**: `gh pr checks <number> --watch`, in the background or with a long timeout. When it says no checks are reported, go on. The gate blocks a check that has not finished.
 5. **Run the gate** with the command the brief gives. Exit 6: fix what it lists under `blocked`, then run it again. Do not edit the gate file.
 6. **Mark it ready**: `gh pr ready <number>`.

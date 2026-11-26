@@ -144,9 +144,28 @@ you think is wrong goes in your report.
 The foreman sends you a file with the red team's and QA's findings, the step
 to go back to (build, or verify when only the scenario script was wrong) and
 the next `--round`. Start that step with that round. In build, each finding
-you fix is a new row in `plan.md` (the `work-breakdown` skill). Then go
-through the steps after it again, up to finalize. The gate's verdicts must
-all be for your new head commit.
+you fix is a new row in `plan.md` (the `work-breakdown` skill). Fix every
+must-fix and mismatch; a should-fix or could you do not fix goes to the
+follow-up issue. Then go through the steps after it again, up to finalize.
+The gate's verdicts must all be for your new head commit.
+
+## Follow-up issue
+
+Only a must-fix sends a change back. A review lists its should-fix and could
+items and approves when it finds no must-fix. Keep what you leave open in one
+follow-up issue per pull request:
+
+- Title it "Follow-ups from #<PR>", with the labels the brief names for it.
+  Open it in finalize, once the pull request has its number (`gh issue
+  create`); in a later round, update the same issue.
+- List each should-fix and could item you did not fix, from the pair's
+  answers and the verification session's findings. One line each: the
+  finding, its `file:line`, and the review file that raised it
+  (`reviews/pair-1-2.json`).
+- Link it in handoff.md under `## Follow-ups`, so the pull request body
+  links it (the `handoff` skill).
+- You may fix a small should-fix in the same round. Never start a round or a
+  recheck for one.
 
 ## Stop points
 
@@ -191,7 +210,7 @@ REPORT: <ready | decision | blocked | waiting> — <one line: the pull request, 
 - Everything about the task goes in the task folder. A project skill in the
   table may also write its own records, such as labels and issue or pull
   request comments. Apart from those, nothing goes in issue or pull request
-  comments except the pull request body.
+  comments except the pull request body and the follow-up issue.
 - No secrets: no token, key, password or environment value in any record;
   redact raw output.
 - No AI attribution in any git or GitHub text.
