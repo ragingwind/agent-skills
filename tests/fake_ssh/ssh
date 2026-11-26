@@ -1,0 +1,6 @@
+#!/bin/sh
+# A stand-in for ssh in tests: it drops the -o options and the target, and runs the remote command on this
+# machine with the same stdin, so the code that ssh would send runs for real.
+while [ "$1" = "-o" ]; do shift 2; done
+shift
+exec sh -c "$1"

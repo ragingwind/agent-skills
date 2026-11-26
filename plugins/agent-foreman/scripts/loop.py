@@ -17,6 +17,10 @@ Settings shape (`loop` in the settings):
            lead is ready; an outcome may send the task back to a work step
   manage   the foreman's loop
   epic     the batch loop before an epic goes to main
+  tester   not a setting: loop.json's "tester" holds the profiles of the
+           task's testing session, which runs the check loop's steps as one
+           agent (status.py, the tester folder): one tier above the lead,
+           never the lead's profile (config.role_candidates)
   decisions  who takes a lead's decision points: "person" (the default; the
            lead stops and asks) or "lead" (the lead takes its recommended
            option, records it and goes on; loop.md, Stop points). loop.json
@@ -420,7 +424,8 @@ def as_data(cfg, task, difficulty, trivial, resolved, call_name, repo, base, lea
            "post_answers": cfg.get("post_answers") is True,
            "gate": [dict(c) for c in cfg.get("gate", [])],
            "max_lines": cfg["difficulty"]["lines"], "size_severity": "block",
-           "decisions": loop.get("decisions", "person"), "roles": {}}
+           "decisions": loop.get("decisions", "person"), "tester": {"profiles": profiles.get("tester", [])},
+           "roles": {}}
     overrides = cfg.get("skills", {})
     for which in ("work", "check"):
         steps = plan(loop, difficulty, trivial, which)
@@ -439,6 +444,13 @@ def as_data(cfg, task, difficulty, trivial, resolved, call_name, repo, base, lea
             if r in out["roles"] and earlier_steps(steps, s):
                 out["roles"][r]["recheck_limit"] = loop["roles"][r].get("recheck_limit", RECHECK_LIMIT)
     return out
+
+
+def role_profiles(cfg, difficulty, lead):
+    """Role -> the profiles it may run on, for each role of the loop and the
+    tester: never the lead's."""
+    from config import role_candidates
+    return {r: role_candidates(cfg, difficulty, r, lead=lead) for r in [*cfg["loop"]["roles"], "tester"]}
 
 
 def earlier_steps(steps, step):
@@ -789,7 +801,7 @@ def _cli(argv):
 
     import adapters
     from config import (EXIT_SETUP_NEEDED, REPO, herdr_machines, lead_profile, load, local_skills, plugin_dirs,
-                        plugin_list, role_candidates, whole_plugins)
+                        plugin_list, whole_plugins)
     kind = args.agent or adapters.DEFAULT
     if kind not in adapters.KINDS:
         print(f"loop.py: --agent must be one of {', '.join(adapters.KINDS)} for {args.command}", file=sys.stderr)
@@ -848,7 +860,7 @@ def _cli(argv):
         print(f"loop.py: --lead {lead!r} is not a profile", file=sys.stderr)
         return 2
     adapter = adapters.get(kind)
-    profiles = {r: role_candidates(cfg, args.difficulty, r, lead=lead) for r in cfg["loop"]["roles"]}
+    profiles = role_profiles(cfg, args.difficulty, lead)
 
     def call_name(source, value):
         return value if source in ("project", "plugin") else adapter.skill_name(value)
