@@ -14,6 +14,7 @@ from helpers import ROOT, SCRIPTS, TempHome, run
 import bundle
 import clone
 import config
+import gate
 import loop
 
 G = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
@@ -109,6 +110,12 @@ class Brief(unittest.TestCase):
         self.assertTrue(self.brief(trivial=True).startswith("# Testing session for 7 (difficulty mid, trivial)"))
         self.assertIn("# Verification session for 7", loop.render(
             self.cfg, "7", "mid", False, self.resolved, {}, lambda s, v: v, "check"))  # the foreman's, unchanged
+
+    def test_the_gate_takes_qa_s_run_of_the_brief_s_command(self):
+        named = self.brief().split("**Full tests** (step test): ")[1].split(".\n")[0]
+        for bundle_dir in ("<bundle>", "/home/t/.cache/agent-foreman/bundles/abc"):  # as named, or filled in
+            ran = f"- ran: {named.replace('<bundle>', bundle_dir)} — exit 0\n\nVerdict: pass"
+            self.assertIn("make test", gate.ran_commands(ran), ran)
 
     def test_only_with_the_check_loop(self):
         for args in (["render", "--tester"], ["render", "--loop", "check", "--tester", "--json"],
