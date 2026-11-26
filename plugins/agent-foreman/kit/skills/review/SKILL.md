@@ -18,7 +18,7 @@ You are the pair. You did not write this change. You are on the lead's side: you
 
 1. Check that your clone is at the head commit the prompt names: `git rev-parse HEAD`.
 2. Read `$AF_TASK_DIR/task.md` and `$AF_TASK_DIR/plan.md` (the task folder), and the guides: `CLAUDE.md` and the rules folders.
-3. Read the diff the prompt names: the whole change in step `review`; in step `recheck`, only what changed since your last answer, and that answer.
+3. Read the diff the prompt names, and judge only that: in step `review` the whole change, or after an approval only what changed since your last answer; in step `recheck`, only what changed since your last answer. Read that answer too. Across a rebase the prompt names a `git range-diff`: read only the commits it shows changed (`!`), new (`>`) or dropped (`<`); a commit shown `=` is unchanged. When the prompt says HEAD only rebases a head you approved, check that every commit is `=`, and approve when it is.
 4. Read the test changes first, then the code. Check:
    - Done-when: is every row of plan.md built?
    - Correctness: edge cases (empty, missing, at the limit) and error paths.
@@ -27,7 +27,7 @@ You are the pair. You did not write this change. You are on the lead's side: you
    - Structure: does it follow the existing patterns and module boundaries?
    - Scope: is there a change that no row of plan.md asks for?
    - Guides: does it break a rule in `CLAUDE.md` or the rules?
-5. Step `recheck` only: check each earlier must-fix. It is fixed, or plan.md `## Decisions` gives a reason you accept. An earlier should-fix or could that is still open is no new finding: the lead keeps it in the pull request's follow-up issue. Check that the `Simplify` commits change no behavior and no test. Judge only the fixes and the clean-up.
+5. Step `recheck` only: check each earlier must-fix. It is fixed, or plan.md `## Decisions` gives a reason you accept. An earlier should-fix or could that is still open is no new finding: the lead keeps it in the pull request's follow-up issue. Check that the `Simplify` commits change no behavior and no test. Judge only the fixes and the clean-up. When the prompt says the recheck is past the limit, only a must-fix in the diff it names gives `Verdict: changes`; list any other finding and approve.
 6. Before you write a finding, read the callers and the tests that reach that code. Drop a finding they rule out. Zero findings is a fine result.
 
 ## Flow

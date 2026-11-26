@@ -5,7 +5,10 @@ how they change with a task's difficulty.
 Settings shape (`loop` in the settings):
 
   roles    name -> {"mode": "prompt"|"pane", "step": 0|1, "prompt": key, "deny_tools": [...],
-                   "accept": [passing verdicts]}
+                   "accept": [passing verdicts], "recheck_limit": N}
+           recheck_limit (default 2): the rechecks of one review in which any
+           must-fix blocks; from the next one on, only a must-fix in the
+           change since the role's last answer does
   prompts  key -> fixed prompt text a role gets; `loop.py prompt` fills in
            <task>, <repo>, <base>, <head>, <diff>, <task folder>, <skill>,
            <skills>, <full test command> and <trivial>
@@ -57,9 +60,19 @@ with.
 into the task folder's reviews/ (`<agent>-<n>.prompt.md`), filled in from
 loop.json and the clone's head, and prints the launch.py commands that run it:
 the first profile, then each fallback for exit 5. --task-dir defaults to
-AF_TASK_DIR, --agent to `<role>-1`. A step that follows an earlier step of the
-same role (the pair's recheck) gets only the diff since that agent's last
-answer.
+AF_TASK_DIR, --agent to `<role>-1`.
+
+The <diff> it fills in is the whole change, from origin/<base> to HEAD,
+unless the role answered before (reviews/*.meta.json) and one of these holds:
+the step follows an earlier step of the same role (the pair's recheck); the
+step is in the check loop (the red team from its second round on); or the
+role's last answer approved. Then it is only the change since the head of
+that answer: `git diff <head>..HEAD` when HEAD builds on it, or `git
+range-diff` across a rebase, which for a head that only rebases an approved
+one asks the role to check that every commit is unchanged. A recheck past
+the role's recheck_limit says so; the JSON then holds `recheck` and
+`recheck_limit`. The rechecks are counted in status.jsonl since the role's
+earlier step or its last approval.
 
 `post`, for a project with `post_answers`, posts the latest saved answer of
 the step's role (of --agent, when given) on pull request N, whole, as one
@@ -93,6 +106,11 @@ RUNS = ["always", "never", "if-not-trivial"]
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 REPLACED_NOTE = re.compile(r" \(flow and record: [^)]*\)$")
 STOP = "stop"
+# The person's choice of 2026-11-27: after two rechecks, only a must-fix in the newest change blocks.
+RECHECK_LIMIT = 2
+SHA = re.compile(r"^[0-9a-f]{7,64}$")
+# One commit pair of `git range-diff`, such as "1:  52f46f8 = 1:  70d35d1 subject"; "=" means unchanged.
+RANGE_PAIR = re.compile(r"^\s*(?:\d+|-+):\s+(?:[0-9a-f]+|-+)\s+([=!<>])\s+(?:\d+|-+):\s")
 
 
 def validate_loop(loop):
@@ -122,6 +140,9 @@ def validate_loop(loop):
         deny = role.get("deny_tools", [])
         if not isinstance(deny, list) or not all(isinstance(t, str) and t for t in deny):
             problems.append(f"loop: role {name}: deny_tools must be a list of tool names")
+        limit = role.get("recheck_limit", RECHECK_LIMIT)
+        if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
+            problems.append(f"loop: role {name}: recheck_limit must be a whole number, 1 or more")
     if not loop.get("work"):
         problems.append("loop: the work loop has no steps")
     for which in LOOPS:
@@ -407,12 +428,22 @@ def as_data(cfg, task, difficulty, trivial, resolved, call_name, repo, base, lea
                 out["roles"][r] = {"mode": role["mode"], "prompt": loop["prompts"].get(role.get("prompt"), ""),
                                    "accept": role.get("accept", ["approved"]),
                                    "deny_tools": role.get("deny_tools", []), "profiles": profiles.get(r, [])}
+            if r in out["roles"] and earlier_steps(steps, s):
+                out["roles"][r]["recheck_limit"] = loop["roles"][r].get("recheck_limit", RECHECK_LIMIT)
     return out
 
 
-def last_run(task_dir, agent):
-    """(meta, answer file) of an agent's latest finished run in the task
-    folder's reviews/, or None."""
+def earlier_steps(steps, step):
+    """The ids of the steps of the same actor before `step` in its loop. A
+    step that has them checks what that actor answered before: the pair's
+    recheck."""
+    return [s["id"] for s in steps[:steps.index(step)] if s["actor"] == step["actor"]]
+
+
+def last_answer(task_dir, role):
+    """(meta, answer file, verdict) of the role's latest run that ended with a
+    verdict, from the task folder's reviews/, or None."""
+    from gate import last_verdict
     best = None
     for meta_file in glob.glob(os.path.join(task_dir, "reviews", "*.meta.json")):
         try:
@@ -420,10 +451,116 @@ def last_run(task_dir, agent):
                 meta = json.load(f)
         except (OSError, ValueError):
             continue
-        if isinstance(meta, dict) and meta.get("agent") == agent and meta.get("ok") is True and (
-                best is None or str(meta.get("ended", "")) > str(best[0].get("ended", ""))):
-            best = (meta, meta_file[:-len(".meta.json")] + ".json")
+        if not (isinstance(meta, dict) and meta.get("role") == role and meta.get("ok") is True):
+            continue
+        answer = meta_file[:-len(".meta.json")] + ".json"
+        verdict = str(meta.get("verdict") or "")
+        if not verdict:
+            try:
+                with open(answer, encoding="utf-8") as f:
+                    verdict = last_verdict(json.load(f).get("result"))
+            except (OSError, ValueError, AttributeError):
+                continue
+        if verdict and (best is None or str(meta.get("ended", "")) > str(best[0].get("ended", ""))):
+            best = (meta, answer, verdict.lower())
     return best
+
+
+def _git(*args):
+    return subprocess.run(["git", *args], capture_output=True, text=True)
+
+
+def since(last):
+    """How this clone's HEAD stands to the head a role last answered on:
+    "same", "after" (HEAD builds on it), "rewritten" (a rebase or an amend
+    since), or "unknown" when the clone cannot get that commit, even from
+    origin."""
+    if not SHA.match(last):
+        return "unknown"
+    if _git("cat-file", "-e", f"{last}^{{commit}}").returncode != 0:
+        _git("fetch", "--quiet", "origin", last)
+        if _git("cat-file", "-e", f"{last}^{{commit}}").returncode != 0:
+            return "unknown"
+    if _git("rev-parse", f"{last}^{{commit}}").stdout.strip() == _git("rev-parse", "HEAD").stdout.strip():
+        return "same"
+    return "after" if _git("merge-base", "--is-ancestor", last, "HEAD").returncode == 0 else "rewritten"
+
+
+def range_scope(base, last, answer, approved):
+    """The <diff> across a rebase: the pull request's commits at `last` and at
+    HEAD, side by side (`git range-diff`), or None when this clone cannot
+    compute it."""
+    ref = f"origin/{base}"
+    out = _git("range-diff", "--no-color", f"{ref}..{last}", f"{ref}..HEAD")
+    if out.returncode != 0:
+        return None
+    marks = [m.group(1) for m in map(RANGE_PAIR.match, out.stdout.splitlines()) if m]
+    command = f"`git range-diff {ref}..{last} {ref}..HEAD`"
+    if approved and marks and all(mark == "=" for mark in marks):
+        return (f"{command}: HEAD only rebases {last}, the head you last approved (your answer is {answer}), and "
+                f"the range-diff shows each commit of the pull request unchanged. Check that it does, and approve "
+                f"when it does")
+    return (f"{command}: the pull request's commits since {last}, the head of your last answer ({answer}), which "
+            f"HEAD rebased. Read only the commits it shows changed (!), new (>) or dropped (<)")
+
+
+def rechecks_done(task_dir, step_id, earlier, accept):
+    """How often `step_id` ended without approving since an earlier step of
+    its role ended, or since it last approved: the rechecks of one review so
+    far. An end line written again at once, to correct its evidence, counts
+    once."""
+    count, last = 0, None
+    try:
+        with open(os.path.join(task_dir, "status.jsonl"), encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return 0
+    for line in lines:
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(row, dict) or row.get("event") not in ("start", "end", "progress", "stop"):
+            continue
+        step, event = row.get("step"), row.get("event")
+        if event == "end" and (step in earlier or (step == step_id and row.get("outcome") in accept)):
+            count = 0
+        elif event == "end" and step == step_id and last != (step, "end"):
+            count += 1
+        last = (step, event)
+    return count
+
+
+def review_scope(task_loop, task_dir, steps, step, role, agent):
+    """(the prompt's <diff>, recheck facts): the whole change, or only the
+    change since the head the role last answered on (module docstring)."""
+    base = task_loop["base"]
+    whole = f"from origin/{base} to HEAD"
+    earlier = earlier_steps(steps, step)
+    found = last_answer(task_dir, step["actor"])
+    if earlier and found is None:
+        raise ValueError(f"{agent} has no earlier answer to check against; run step {earlier[-1]} first")
+    if found is None:
+        return whole, {}
+    meta, answer, verdict = found
+    approved = verdict in role.get("accept", ["approved"])
+    if not (earlier or step in task_loop.get("check", []) or approved):
+        return whole, {}
+    last = str(meta.get("head") or "")
+    where = since(last)
+    scoped = range_scope(base, last, answer, approved) if where == "rewritten" else None
+    if not earlier:
+        if where == "after":
+            scoped = f"from {last} to HEAD: only the change since the head of your last answer, which is {answer}"
+        return scoped or whole, {}
+    limit = role.get("recheck_limit", RECHECK_LIMIT)
+    number = rechecks_done(task_dir, step["id"], earlier, role.get("accept", ["approved"])) + 1
+    scoped = scoped or (f"from {last} to HEAD: only the fixes and the clean-up since your last review, whose answer "
+                        f"is {answer}")
+    if number > limit:
+        scoped += (f". This is recheck {number} of this review, past the limit of {limit}: only a must-fix in this "
+                   f"diff gives `Verdict: changes`")
+    return scoped, {"recheck": number, "recheck_limit": limit}
 
 
 def role_run(task_loop, task_dir, step_id, agent, head, launch):
@@ -449,14 +586,7 @@ def role_run(task_loop, task_dir, step_id, agent, head, launch):
     if not candidates:
         raise ValueError(f"role {r} has no profile other than the lead's; add one with /agent-foreman:agent-foreman setup")
     base = task_loop["base"]
-    diff = f"from origin/{base} to HEAD"
-    earlier = [s["id"] for s in steps[:steps.index(step)] if s["actor"] == r]
-    if earlier:
-        found = last_run(task_dir, agent)
-        if found is None:
-            raise ValueError(f"{agent} has no earlier answer to check against; run step {earlier[-1]} first")
-        diff = (f"from {found[0].get('head')} to HEAD: only the fixes and the clean-up since your last review, "
-                f"whose answer is {found[1]}")
+    diff, recheck = review_scope(task_loop, task_dir, steps, step, role, agent)
     skills = ", ".join(REPLACED_NOTE.sub("", s) for s in step["skills"])
     values = {"task": task_loop["task"], "repo": task_loop["repo"], "base": base, "head": head, "diff": diff,
               "task folder": task_dir, "skill": skills, "skills": skills,
@@ -476,7 +606,7 @@ def role_run(task_loop, task_dir, step_id, agent, head, launch):
     commands = [shlex.join(["python3", launch, p, "--print", "--role", r, "--name", agent, "--task-dir", task_dir,
                             "--prompt-file", prompt_file, "--out", out] + (["--disallow", ",".join(deny)] if deny else []))
                 for p in candidates[first:] + candidates[:first]]
-    return {"agent": agent, "text": text, "prompt": prompt_file, "out": out, "commands": commands}
+    return {"agent": agent, "text": text, "prompt": prompt_file, "out": out, "commands": commands, **recheck}
 
 
 def render(cfg, task, difficulty, trivial, resolved, profiles, call_name, which="work"):

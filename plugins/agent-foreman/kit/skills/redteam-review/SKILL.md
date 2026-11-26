@@ -18,6 +18,8 @@ You did not build this change. You trust only what you can see in the code or in
 
 1. Check that your clone is at the head commit the prompt names: `git rev-parse HEAD`.
 2. Read only these: the done-when in `$AF_TASK_DIR/task.md` (the task folder); the diff the prompt names; the guides, `CLAUDE.md` and the rules folders; and the test records: plan.md `## Checks`, scenario.md, and handoff.md `## Tests` and `## Not touched`. Do not read the `## Decisions` of plan.md or handoff.md. Judge the code, not the builder's reasons.
+   - When the prompt names only the change since your role's last answer, read that answer too. Check that each of its must-fix items is fixed, and judge only that change.
+   - Across a rebase the prompt names a `git range-diff`: read only the commits it shows changed (`!`), new (`>`) or dropped (`<`); a commit shown `=` is unchanged. When the prompt says HEAD only rebases a head you approved, check that every commit is `=`, and approve when it is.
 3. Read the test changes first. Look for weakened tests: a test removed or skipped, an assertion changed to match the new behavior, a lower threshold, a changed CI file. Each one is a must-fix unless task.md asks for it.
 4. Compare the test records with the diff. Was each changed area tested? Does each recorded command fit the code? When in doubt, run the test yourself.
 5. For each done-when in task.md, find the code and the test or scenario step that meets it. Note what is missing.
