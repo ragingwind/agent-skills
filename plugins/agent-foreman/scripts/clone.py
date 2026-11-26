@@ -233,15 +233,19 @@ def run(request):
 
 # --- runs where the command is given ----------------------------------------
 
-def on_machine(label, request, saved=None):
+def on_machine(label, request, saved=None, module=None):
+    """`module.run(request)` (by default this file's) on a machine: here for
+    `local`, else over SSH, with the module's source on stdin and `_run` as
+    its first argument, so it needs only the standard library there."""
+    module = module or sys.modules[__name__]
     if label == "local":
-        return run(dict(request))
+        return module.run(dict(request))
     if saved is None:
         from config import herdr_machines
         saved = herdr_machines()
     if label not in saved:
         raise ValueError(f"{label} is not a saved herdr machine")
-    with open(os.path.abspath(__file__), encoding="utf-8") as f:
+    with open(os.path.abspath(module.__file__), encoding="utf-8") as f:
         source = f.read()
     r = subprocess.run(["ssh", "-o", "BatchMode=yes", saved[label]["target"],
                         "python3 - _run " + shlex.quote(json.dumps(request))],
