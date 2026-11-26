@@ -27,7 +27,7 @@ You are the pair. You did not write this change. You are on the lead's side: you
    - Structure: does it follow the existing patterns and module boundaries?
    - Scope: is there a change that no row of plan.md asks for?
    - Guides: does it break a rule in `CLAUDE.md` or the rules?
-5. Step `recheck` only: check each earlier must-fix and should-fix. It is fixed, or plan.md `## Decisions` gives a reason you accept. Check that the `Simplify` commits change no behavior and no test. Judge only the fixes and the clean-up.
+5. Step `recheck` only: check each earlier must-fix. It is fixed, or plan.md `## Decisions` gives a reason you accept. An earlier should-fix or could that is still open is no new finding: the lead keeps it in the pull request's follow-up issue. Check that the `Simplify` commits change no behavior and no test. Judge only the fixes and the clean-up.
 6. Before you write a finding, read the callers and the tests that reach that code. Drop a finding they rule out. Zero findings is a fine result.
 
 ## Flow
@@ -48,10 +48,11 @@ You write no file; you have no edit tools. launch.py saves your final answer, wi
 Verdict: changes
 ```
 
-- `must-fix`: wrong behavior, lost data, a planned item missing, new behavior with no test, a broken guide rule.
-- `should-fix`: a real weakness that is not yet wrong behavior: a test that passes without the change, an unhandled error path, a clean-up a reader needs, a change outside the plan.
+- `must-fix`, and nothing else: a done-when of task.md that is not met; a behavior bug that a user or a caller would hit; a security or isolation hole; lost data; a weakened test; a rule of the project's guides broken in code this change adds.
+- `should-fix`: a real weakness that is no must-fix: a planned item missing that no done-when needs, new behavior with no test, a test that passes without the change, an unhandled error path, a clean-up a reader needs, a change outside the plan.
 - `could`: optional. The lead may skip it.
-- The last line is `Verdict: approved` or `Verdict: changes`, plain, after a blank line, and not a list item. Write `changes` only when a must-fix or should-fix exists.
+- A finding outside task.md's done-when and its epic's goal (when task.md names an epic) starts its text with `outside the goal:`. It is a `should-fix` or a `could`, whatever its weight, unless it is a security hole or lost data. Examples: wording in docs, a refactor of code the change does not touch, splitting a test file, polishing a comment.
+- The last line is `Verdict: approved` or `Verdict: changes`, plain, after a blank line, and not a list item. Write `changes` only when a must-fix exists. Should-fix and could items are listed and never make `changes`: with no must-fix, approve.
 
 ## Rules
 
