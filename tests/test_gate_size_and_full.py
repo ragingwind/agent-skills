@@ -15,6 +15,7 @@ from test_gate import BASE, HEAD, check, pr
 
 import config
 import gate
+import loop
 
 G = ["git", "-c", "user.name=t", "-c", "user.email=t@example.invalid"]
 PASSED = "- ran: false — exit 0\n\n  ```\n  0 failed\n  ```\n\nVerdict: pass"
@@ -138,6 +139,14 @@ class FullTests(unittest.TestCase):
                                                 f"and its answer reviews/qa-1-1.json says Verdict: pass"))
         self.qa("- ran: `false` — exit 0\n\nVerdict: pass")
         self.assertTrue(self.command()[0])
+        named = loop.full_test_command({"tests_full": "false", "disk_min_free_gb": 20})  # as QA's prompt names it
+        self.qa(f"- ran: {named} — exit 0\n\nVerdict: pass")
+        self.assertTrue(self.command()[0])
+        other = loop.full_test_command({"tests_full": "make lint", "disk_min_free_gb": 20})
+        self.qa(f"- ran: {other} — exit 0\n\nVerdict: pass")
+        self.assertFalse(self.command()[0])
+        self.qa("- ran: echo fulltest.py -- false — exit 0\n\nVerdict: pass")  # not fulltest.py running it
+        self.assertFalse(self.command()[0])
 
     def test_anything_less_runs_it(self):
         for text, meta in ((PASSED.replace("Verdict: pass", "Verdict: fail"), {}),
