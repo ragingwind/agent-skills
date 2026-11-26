@@ -13,7 +13,7 @@ nowhere, for an agent that only judges: `gh` still finds the repository, and
 is not a sandbox). A marker in `.git` records that agent-foreman made it.
 
 Usage:
-  clone.py make --project OWNER/REPO --task TASK --agent AGENT --ref REF
+  clone.py make --project OWNER/REPO --task TASK --agent AGENT (--ref REF | --pr N [--ref SHA])
                 [--from PATH] [--machine MACHINE] [--no-push] [--fresh] [--force]
                 [--instructions-from SHA]
   clone.py check PATH [--machine MACHINE]
@@ -25,6 +25,10 @@ make: --from defaults to the project's checkout on that machine (its
 settings); --ref is what to check out (detached), such as `origin/main` or a
 head SHA. An existing clone of the same agent is kept (status `exists`);
 --fresh removes it first, under the same rules as remove.
+--pr N, for the tester: fetches the pull request's head (`pull/<N>/head`)
+from origin into the clone, so any machine's checkout will do, even one that
+never saw the lead's branch. --ref then defaults to that head; a --ref
+given too (the head the foreman names) is checked out after that fetch.
 --instructions-from SHA, for a judging agent: the files an agent reads as
 instructions (`.claude/`, `CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`, at any
 depth) are put back as commit SHA has them (the base branch's head on GitHub,
@@ -174,7 +178,7 @@ def restore_instructions(dest, sha):
     return restored
 
 
-def make(key, task, agent, source, ref, fresh=False, force=False, no_push=False, instructions_from=None):
+def make(key, task, agent, source, ref, fresh=False, force=False, no_push=False, instructions_from=None, pr=None):
     dest = clone_path(key, task, agent)
     if os.path.exists(dest):
         if not fresh:
@@ -199,14 +203,18 @@ def make(key, task, agent, source, ref, fresh=False, force=False, no_push=False,
         if no_push:
             _git("remote", "set-url", "--push", "origin", NO_PUSH, cwd=dest)
         _git("fetch", "--quiet", "--prune", "origin", cwd=dest)
+        if pr:
+            _git("fetch", "--quiet", "origin", f"pull/{pr}/head", cwd=dest)
+            ref = ref or _git("rev-parse", "FETCH_HEAD", cwd=dest)
         _git("checkout", "--quiet", "--detach", ref, cwd=dest)
         # The branch `git clone` made is the source's, not the agent's; the agent cuts its own.
         for branch in _git("for-each-ref", "--format=%(refname:short)", "refs/heads/", cwd=dest).split():
             _git("branch", "--quiet", "-D", branch, cwd=dest)
         restored = restore_instructions(dest, instructions_from) if instructions_from else []
         with open(os.path.join(dest, ".git", MARK), "w", encoding="utf-8") as f:
-            json.dump({"project": key, "task": task, "agent": agent, "source": source, "ref": ref, "push": not no_push,
-                       "restored": restored, "made": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, f)
+            json.dump({"project": key, "task": task, "agent": agent, "source": source, "ref": ref, "pr": pr,
+                       "push": not no_push, "restored": restored,
+                       "made": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}, f)
         head = _git("rev-parse", "HEAD", cwd=dest)
     except RuntimeError as e:
         shutil.rmtree(dest, ignore_errors=True)
@@ -356,6 +364,7 @@ def main(argv):
     ap.add_argument("--task")
     ap.add_argument("--agent")
     ap.add_argument("--ref")
+    ap.add_argument("--pr", type=int, help="make: fetch this pull request's head and start there")
     ap.add_argument("--from", dest="source", metavar="PATH")
     ap.add_argument("--machine", default="local")
     ap.add_argument("--no-push", action="store_true")
@@ -408,8 +417,10 @@ def main(argv):
         if args.command == "remove":
             request = {"op": "remove", "key": key, "task": args.task, "agent": args.agent, "force": args.force}
         else:
-            if not (args.agent and args.ref):
-                return bad("make needs --agent and --ref")
+            if args.pr is not None and args.pr < 1:
+                return bad("--pr takes a pull request number")
+            if not (args.agent and (args.ref or args.pr)):
+                return bad("make needs --agent, and --ref or --pr")
             source = args.source or load(args.project).get("machines", {}).get(args.machine)
             if not source:
                 print(f"clone.py: no --from, and project {args.project} names no checkout on {args.machine}",
@@ -419,7 +430,7 @@ def main(argv):
                 return bad("--instructions-from takes a commit SHA, such as the base branch's head on GitHub")
             request = {"op": "make", "key": key, "task": args.task, "agent": args.agent, "source": source,
                        "ref": args.ref, "fresh": args.fresh, "force": args.force, "no_push": args.no_push,
-                       "instructions_from": args.instructions_from}
+                       "instructions_from": args.instructions_from, "pr": args.pr}
     try:
         out = on_machine(args.machine, request)
     except (ValueError, RuntimeError) as e:

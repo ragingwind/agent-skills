@@ -53,8 +53,13 @@ Usage:
   loop.py skills --project OWNER/REPO --machine MACHINE
   loop.py render --project OWNER/REPO --task N --difficulty low|mid|high --machine MACHINE
                  [--base BRANCH] [--lead PROFILE] [--loop work|check] [--trivial] [--agent KIND] [--json]
+                 [--tester]
   loop.py prompt --step ID [--task-dir DIR] [--agent NAME]
   loop.py post --step ID --pr N [--task-dir DIR] [--agent NAME]
+
+`render --loop check --tester` prints the check loop for the tester's brief:
+its two steps and skills, the tester's profile, the full test command and
+the verdicts that pass, for the one session that runs both (tester.md).
 
 `render --json` prints the task's loop as data: its work and check steps,
 the base, the lead's profile (--lead, the one the lead really runs on; by
@@ -402,13 +407,18 @@ def stage_labels(cfg, task, steps):
     return out
 
 
-def full_test_command(task_loop):
-    """The project's full test command as a role runs it: through fulltest.py, next to this file, which runs
-    one at a time on the machine and not under the disk floor."""
+def disk_floor(cfg):
+    """The free space a full test run needs, in GB; 0 with the disk check off."""
+    return cfg["ops"]["disk_min_free_gb"] if cfg["ops"].get("disk_check", True) else 0
+
+
+def full_test_command(task_loop, script=None):
+    """The project's full test command as a role runs it: through fulltest.py (`script`, by default the one
+    next to this file), which runs one at a time on the machine and not under the disk floor."""
     command = task_loop.get("tests_full")
     if not command:
         return "none is set; write `not run: no full test command`"
-    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fulltest.py")
+    script = script or os.path.join(os.path.dirname(os.path.abspath(__file__)), "fulltest.py")
     return (f"python3 {shlex.quote(script)} --min-free-gb {task_loop.get('disk_min_free_gb', 0):g} -- "
             f"{shlex.quote(command)}")
 
@@ -420,7 +430,7 @@ def as_data(cfg, task, difficulty, trivial, resolved, call_name, repo, base, lea
     loop = cfg["loop"]
     out = {"repo": repo, "task": task, "base": base, "difficulty": difficulty, "trivial": trivial,
            "lead_profile": lead, "tests_full": cfg.get("tests", {}).get("full"),
-           "disk_min_free_gb": cfg["ops"]["disk_min_free_gb"] if cfg["ops"].get("disk_check", True) else 0,
+           "disk_min_free_gb": disk_floor(cfg),
            "post_answers": cfg.get("post_answers") is True,
            "gate": [dict(c) for c in cfg.get("gate", [])],
            "max_lines": cfg["difficulty"]["lines"], "size_severity": "block",
@@ -637,9 +647,9 @@ DECISION_LINES = {
 }
 
 
-def render(cfg, task, difficulty, trivial, resolved, profiles, call_name, which="work"):
+def render(cfg, task, difficulty, trivial, resolved, profiles, call_name, which="work", tester=False):
     """One loop of a task, as Markdown: the work loop for the lead's brief, or
-    the check loop for the foreman.
+    the check loop for the foreman, or with `tester` for the tester's brief.
 
     resolved: skill name -> (source, value); profiles: role -> candidate
     profiles in order (config.role_candidates); call_name(source, value) ->
@@ -649,11 +659,13 @@ def render(cfg, task, difficulty, trivial, resolved, profiles, call_name, which=
     steps = plan(loop, difficulty, trivial, which)
     stage = {s["id"]: s["stage"] for s in steps}
     labels = stage_labels(cfg, task, steps)
-    title = "Loop" if which == "work" else "Verification session"
+    title = "Loop" if which == "work" else "Testing session" if tester else "Verification session"
     lines = [f"# {title} for {task} (difficulty {difficulty}{', trivial' if trivial else ''})", ""]
     ops = cfg["ops"]
-    lines += [f"**Status**: a `start` and an `end` line for every step you run (`status.py note`, as loop.md says), "
-              f"and a `progress` line at least every {ops['report_minutes']} minutes in a long step; "
+    lines += [(f"**Status**: a `start` line for each step you run, a `stop` line with your REPORT at the end of "
+               f"each round (`status.py note`, as tester.md says)," if tester else
+               f"**Status**: a `start` and an `end` line for every step you run (`status.py note`, as loop.md says),")
+              + f" and a `progress` line at least every {ops['report_minutes']} minutes in a long step; "
               f"{ops['stall_minutes']} minutes without a line counts as a stall.", ""]
     if which == "work":
         lines += [DECISION_LINES[loop.get("decisions", "person")], ""]
@@ -675,7 +687,18 @@ def render(cfg, task, difficulty, trivial, resolved, profiles, call_name, which=
         lines.append(f"| {i} | {st if first else ''} | {tab} | {s['id']} | {s['actor']} | {s['does'].replace('|', '/')} | "
                      f"{skills} | {nxt} |")
     acting = list(dict.fromkeys(s["actor"] for s in steps if s["actor"] not in PEOPLE))
-    if acting:
+    if tester:
+        mine = profiles.get("tester", [])
+        full = full_test_command({"tests_full": cfg.get("tests", {}).get("full"), "disk_min_free_gb": disk_floor(cfg)},
+                                 "<bundle>/scripts/fulltest.py")
+        accept = {r: loop["roles"][r].get("accept", ["approved"]) for r in acting}
+        passing = "; ".join(f"{r}: " + ", ".join(f"`Verdict: {a}`" for a in words) for r, words in accept.items())
+        lines += ["", f"**Profile**: {mine[0] if mine else '- (no profile for the tester)'}; fallback: "
+                      f"{', '.join(mine[1:]) or '-'}; never the lead's.",
+                  f"**Full tests** (step test): {full}.", f"**Verdicts that pass**: {passing}.", "",
+                  "Run both steps yourself, in this one session, as tester.md says: the red team first, and QA "
+                  "only after the red team approves the same head."]
+    elif acting:
         lines += ["", "| Role | Mode | Profile | Fallback (never the lead's) |", "| --- | --- | --- | --- |"]
         for r in acting:
             candidates = profiles.get(r, [])
@@ -788,12 +811,16 @@ def _cli(argv):
     ap.add_argument("--base", help="render --json: the branch the task starts from and merges into")
     ap.add_argument("--lead", metavar="PROFILE", help="render: the profile the lead runs on")
     ap.add_argument("--json", action="store_true", help="render: the task's loop as data, for loop.json")
+    ap.add_argument("--tester", action="store_true", help="render --loop check: the tester's brief")
     ap.add_argument("--step", help="prompt, post: the step a role agent runs")
     ap.add_argument("--task-dir", help="prompt, post: the task folder (default: AF_TASK_DIR)")
     ap.add_argument("--agent", help="render: the agent kind; prompt: the role agent's name (default <role>-1); "
                                     "post: only this agent's answer")
     ap.add_argument("--pr", type=int, help="post: the pull request number")
     args = ap.parse_args(argv)
+    if args.tester and (args.command != "render" or args.json or args.loop != "check"):
+        print("loop.py: --tester goes with render --loop check, without --json", file=sys.stderr)
+        return 2
     if args.command == "prompt":
         return prompt_cli(args)
     if args.command == "post":
@@ -870,7 +897,8 @@ def _cli(argv):
                                  args.base, lead, profiles), indent=2))
     else:
         which = args.loop if args.loop in ("work", "check") else "work"
-        print(render(cfg, args.task, args.difficulty, args.trivial, resolved, profiles, call_name, which), end="")
+        print(render(cfg, args.task, args.difficulty, args.trivial, resolved, profiles, call_name, which,
+                     args.tester), end="")
     for src, value in resolved.values():
         if src == "missing":
             print(f"loop.py: missing skill: {value}", file=sys.stderr)
