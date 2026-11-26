@@ -135,8 +135,11 @@ class Brief(unittest.TestCase):
                       "after the exit code",
                       "REPORT: tested <head> — redteam <verdict>, qa <verdict, or not run>, must-fix:",
                       "Never write to the lead or into the lead's task folder.",
-                      "status.py note --stage test --step redteam-review --event start --round <k>"):
+                      "status.py note --stage redteam-review --event start --round <k>",
+                      "(`--stage test --event start --round <k>`)"):
             self.assertIn(words, guide)
+        stages = {s["stage"] for s in config.standard()["loop"]["check"]}
+        self.assertEqual(stages, {"redteam-review", "test"})  # the stages the guide names
         usage = run("status.py", "--help").stdout
         for flag in ("--stage", "--step", "--event", "--round", "--done"):
             self.assertIn(flag, usage)

@@ -30,8 +30,8 @@ first, one more for each "Test" line the foreman sends.
 
 The foreman sends one line: "Test #<N> at <head>". Then:
 
-1. Start: `python3 <bundle>/scripts/status.py note --stage test --step
-   redteam-review --event start --round <k>`.
+1. Start: `python3 <bundle>/scripts/status.py note --stage redteam-review
+   --event start --round <k>`. Each check step is its own stage.
 2. In your clone: `git fetch origin pull/<N>/head`, then `git reset --hard
    <head>`. When `git rev-parse HEAD` is not that head, stop and report
    blocked.
@@ -45,7 +45,7 @@ The foreman sends one line: "Test #<N> at <head>". Then:
    skill's Record shape, to `reviews/redteam-<k>.md`. Its last line is the
    verdict.
 4. **QA**, only when the red team approved this head. Start step `test`
-   (`--step test --event start --round <k>`). With the skills the brief
+   (`--stage test --event start --round <k>`). With the skills the brief
    gives it, run the full test command the brief names, at the head, and
    the whole scenario from the pull request's manual test comment, without
    reading the diff. A trivial task has no scenario: run the full tests
@@ -54,7 +54,8 @@ The foreman sends one line: "Test #<N> at <head>". Then:
    item, the command exactly as the brief names it and nothing after the
    exit code, and the path of its log in the fence under the item. Its last
    line is the verdict.
-5. Stop: `--event stop --done "<the REPORT line>"` on the step you are in.
+5. Stop: `--stage <the step you are in> --event stop --done "<the REPORT
+   line>"`.
    Then end your turn with one line:
 
    ```
