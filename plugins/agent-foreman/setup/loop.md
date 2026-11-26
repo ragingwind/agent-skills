@@ -207,6 +207,20 @@ Go into the chosen parts only.
   whole answer, ending with the plain `Verdict:` line. An agent told to post
   often ends with a note about the post instead, with the verdict inside a
   sentence, and the gate finds no verdict.
+- **Recheck limit**: a role's `recheck_limit`, 2 when it is not set (the
+  person's choice of 2026-11-27). It counts the rechecks of one review: a
+  step that follows an earlier step of the same role, such as the pair's
+  `recheck`. `loop.py prompt` counts them in the task's `status.jsonl`,
+  from the role's earlier step or its last approval. A recheck past the
+  limit tells the role that only a must-fix in its diff gives `Verdict:
+  changes`.
+- **Decision points**: `"decisions"` in `loop`, `person` (the standard) or
+  `lead`. With `lead`, the brief's loop gives the lead its decision points:
+  it takes its recommended option, writes it in `plan.md`'s Decisions and a
+  status line, and goes on. It still stops for a merge, an ADR change, a
+  secret, data loss, or work outside the task (`loop.md`, Stop points). Set
+  `lead` when the person will not be there to answer, such as for a night's
+  run.
 - **Answers on the pull request**: `"post_answers": true`, at the project's
   level, when the project's rules want the red team's and QA's answers on
   the pull request. The foreman posts each saved answer whole (`loop.py

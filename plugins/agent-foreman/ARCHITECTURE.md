@@ -348,10 +348,10 @@ None of them runs on the lead's profile (section 4).
 | Stop | Who | When | Held by |
 | --- | --- | --- | --- |
 | Ready | Lead | finalize passed `gate.py run --before-ready`, the pull request is marked ready, and finalize ends with `done` | A script: `status.py note` prints `next: stop` and `status.py read` counts the task stopped. The foreman runs the gate on the claim before the verification session |
-| A decision for the person | Lead | A choice the task does not settle that changes what a user or caller sees, an interface, a schema or file format, or a core module | A prompt (`loop.md`); the lead writes the stop line with `status.py note --event stop` |
+| A decision for the person | Lead | A choice the task does not settle that changes what a user or caller sees, an interface, a schema or file format, or a core module | A prompt (`loop.md`); the lead writes the stop line with `status.py note --event stop`. With `decisions: lead` in loop.json, the lead takes its recommended option and goes on, and stops only for a merge, an ADR change, a secret, data loss or work outside the task |
 | Blocked | Lead | Something it cannot get or do, after trying once more | A prompt; the stop line with `--blocked` |
 | Waiting for the foreman | Lead | At high difficulty, after plan: `plan-check` is the foreman's step | A script: `status.py note` says that the next step is the foreman's, and that the lead stops. The foreman writes `plan-check`'s end line and tells the lead where to go on |
-| The third recheck still says `changes` | Lead | fix and recheck repeat | A prompt only (`loop.md`); no script counts rechecks |
+| A recheck past the limit still says `changes` | Lead | fix and recheck repeat past the role's `recheck_limit` (2 by default) | A script counts: `loop.py prompt` counts the rechecks in `status.jsonl` and tells the pair that only a must-fix in its diff gives `changes`. The decision point after it is a prompt (`loop.md`) |
 | Ask the person | Foreman | No verdict, an `environment` mismatch, a `not run` test, a failure that also fails on the base, 3 rounds that still find something | A prompt (`SKILL.md`). Merging anyway takes `gate.py run --skip verdict:<role>`; the gate refuses a bare `verdict` |
 | Merge blocked | Foreman | The merge gate exits 6 | A script (`gate.py`). A `gate-file` or `loop-file` block: tell the person and merge nothing |
 | High difficulty | Person | The merge gate passed | A prompt (`SKILL.md`) |
@@ -433,7 +433,11 @@ Pass conditions are code, not prose (`scripts/gate.py`).
   - `tests-weakened`: no removed test file, added skip or focus marker,
     edited CI file, changed coverage threshold, or edited agent instructions
     (`.claude/`, `CLAUDE.md`, `AGENTS.md`), except what `allow` names.
-  - `size`, `ready`, and `command`. A `command` check is a command that must
+  - `size`: the added lines, without lockfiles and the files the base
+    commit marks `linguist-generated`, against `max_lines` in loop.json. Its
+    severity is loop.json's `size_severity`: `loop.py render` writes `block`
+    for every new task; a loop.json from before it warns.
+  - `ready`, and `command`. A `command` check is a command that must
     pass in the clone. The command gets `AF_REPO`, `AF_PR`, `AF_TASK`,
     `AF_TASK_DIR`, `AF_BASE`, `AF_BASE_SHA` and `AF_HEAD`. With `from_base`
     instead of `run`, the gate takes the script from GitHub's base commit
@@ -448,6 +452,12 @@ Pass conditions are code, not prose (`scripts/gate.py`).
   `from_base` check. It is never a `run` check from the lead's clone,
   because the lead controls that clone's files and refs. A label that an
   agent sets itself is only a warning.
+- **The full tests run once per head.** The full test command's check takes
+  QA's passing run at the exact head instead of running it again: QA's
+  latest answer, on the terms of QA's verdict check (posted, when the project
+  has `post_answers`), with a `- ran: <command> — exit 0` item. Its evidence
+  names the answer file. Forging that answer takes what forging QA's verdict
+  takes.
 - **Each step's evidence** (`gate.py record --step <step> --task-dir <task
   folder> --cwd <lead's clone>`), when the step ends. The check reads the
   `end` line's evidence and the record of each default skill that the step
@@ -460,7 +470,7 @@ Pass conditions are code, not prose (`scripts/gate.py`).
   `loop-file`, `steps`, `docs`, `ci`, `base-fresh`, a verdict check per role
   (the pair's before ready and at merge, the red team's and QA's at merge),
   the full test command when the project has one, the project's own checks,
-  `tests-weakened`, `size` (a warning) and `ready`. The foreman adds
+  `tests-weakened`, `size` (a block in a new task) and `ready`. The foreman adds
   commands, or an `allow` for what the task asks.
 - The foreman records `gate.py hash <gate.json>` in the ledger and passes it
   to every gate run of its own with `--sha`; a changed gate file blocks as
