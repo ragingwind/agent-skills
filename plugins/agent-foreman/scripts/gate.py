@@ -17,8 +17,9 @@ under "flow and record"):
                   columns and at least one row
   cross-check     in a step with work-breakdown: scenario.md with numbered
                   steps and their Expect lines (not for a trivial task);
-                  elsewhere: scenario.md's Agent blocks filled and its
-                  closing verdict
+                  elsewhere: scenario.md's Agent blocks filled, its
+                  closing verdict, and the verdict of its last addendum
+                  (a later round's rerun of some steps), if any
   tdd, commit     every row done, with a commit that is in the clone (--cwd)
                   and in HEAD's history
   unit            outside the build: a "Tests near the change" entry under
@@ -52,7 +53,8 @@ Checks (each may say "severity": "warn" to report without blocking):
   docs            the task folder's records: every row of plan.md's work
                   breakdown is done, handoff.md has its sections, and
                   scenario.md's closing verdict is pass with every Agent block
-                  filled (not for a trivial task)
+                  filled, and so is its last addendum's (not for a trivial
+                  task)
   ci              every status check finished and passed
   base-fresh      the head contains the base branch's head
   verdict         an agent of "role" whose latest answer in the
@@ -317,6 +319,18 @@ def empty_agent_blocks(scenario):
     return empty
 
 
+def first_verdict(text):
+    """The word of the `Verdict:` line that opens `text`, lower case, or ""."""
+    m = re.match(r"Verdict:\s*(\w+)\s*$", (text or "").strip().split("\n", 1)[0].strip(), re.I)
+    return m.group(1).lower() if m else ""
+
+
+def last_addendum(scenario):
+    """The text under scenario.md's last `## Addendum` heading (a later round's rerun of some steps), or None."""
+    found = re.findall(r"^##\s+Addendum\b[^\n]*\n(.*?)(?=^##\s|\Z)", scenario or "", re.M | re.S)
+    return found[-1] if found else None
+
+
 def check_docs(pr, spec, ctx):
     if not ctx.get("task_dir"):
         return False, "needs --task-dir"
@@ -330,13 +344,15 @@ def check_docs(pr, spec, ctx):
             problems.append(f"handoff.md lacks {', '.join(missing)}")
     if not spec.get("trivial"):
         scenario = read_task_file(ctx, "scenario.md")
-        closing = (section(scenario or "", "Closing") or "").strip()
+        addendum = last_addendum(scenario)
         if scenario is None:
             problems.append("no scenario.md")
-        elif not re.fullmatch(r"Verdict:\s*pass", closing.splitlines()[0].strip() if closing else "", re.I):
+        elif first_verdict(section(scenario, "Closing")) != "pass":
             problems.append("scenario.md's closing verdict is not pass")
         elif empty_agent_blocks(scenario):
             problems.append(f"scenario.md has {empty_agent_blocks(scenario)} Agent block(s) with no output")
+        elif addendum is not None and first_verdict(addendum) != "pass":
+            problems.append("scenario.md's last addendum's verdict is not pass")
     return not problems, "; ".join(problems) if problems else "plan, handoff and scenario in order"
 
 
@@ -581,6 +597,9 @@ def _scenario_run_problems(scenario):
     problems = []
     if not re.match(r"Verdict:\s*\w+", (section(scenario, "Closing") or "").strip(), re.I):
         problems.append("scenario.md has no closing verdict")
+    addendum = last_addendum(scenario)
+    if addendum is not None and not first_verdict(addendum):
+        problems.append("scenario.md's last addendum has no verdict")
     empty = empty_agent_blocks(scenario)
     if empty:
         problems.append(f"scenario.md has {empty} Agent block(s) with no output")
