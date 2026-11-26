@@ -94,8 +94,9 @@ when the disk has less than "min_free_gb" free (exit 75, `fulltest.py: not
 run`). Its "answer" holds a verdict check's terms (role, accept,
 not_profiles, posted), the role whose check-loop step runs the `full` skill
 (QA): when that role's latest answer passes those terms at the exact head
-SHA and lists `- ran: <run> — exit 0`, the check passes without running the
-command again, and its evidence names the answer file. Forging it takes
+SHA and lists `- ran: <run> — exit 0` (also as fulltest.py runs it, the way
+QA's prompt names it), the check passes without running the command again,
+and its evidence names the answer file. Forging it takes
 what forging that role's verdict check takes.
 
 --before-ready skips `ready` and every check marked "at": "merge": the lead
@@ -115,6 +116,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -692,6 +694,27 @@ def _handoff_problems(handoff):
     return [f"handoff.md lacks {n}" for n in HANDOFF_SECTIONS if section(handoff, n) is None]
 
 
+def ran_commands(text):
+    """The commands an answer lists as `- ran: <command> — exit 0`. QA's
+    prompt names the full tests through fulltest.py (`python3 .../fulltest.py
+    --min-free-gb N -- '<run>'`), and QA writes them as named, so a command
+    run that way also counts as the command after its `--`."""
+    out = set()
+    for m in (RAN.match(line.strip()) for line in str(text).splitlines()):
+        if not m:
+            continue
+        out.add(m.group(1).strip())
+        try:
+            words = shlex.split(m.group(1))
+        except ValueError:
+            continue
+        wrapped = (len(words) > 2 and os.path.basename(words[0]).startswith("python")
+                   and os.path.basename(words[1]) == "fulltest.py" and "--" in words[2:])
+        if wrapped:
+            out.add(" ".join(words[words.index("--") + 1:]))
+    return out
+
+
 def ran_in_answer(pr, spec, ctx):
     """Why a full command check needs no run, or None: an answer that its
     "answer" terms accept at the exact head lists `- ran: <run> — exit 0`."""
@@ -699,8 +722,7 @@ def ran_in_answer(pr, spec, ctx):
     if not (spec.get("full") and isinstance(terms, dict) and ctx.get("task_dir")):
         return None
     for agent, meta, answer_file, text in accepted_answers(pr, terms, ctx, exact=True)[0]:
-        ran = [m.group(1).strip() for m in (RAN.match(line.strip()) for line in text.splitlines()) if m]
-        if spec["run"].strip() in ran:
+        if spec["run"].strip() in ran_commands(text):
             return (f"not run again: {agent} ran it at {pr['headRefOid'][:7]} with exit 0, on "
                     f"{meta.get('profile')}, and its answer {os.path.relpath(answer_file, ctx['task_dir'])} "
                     f"says Verdict: {last_verdict(text)}")
