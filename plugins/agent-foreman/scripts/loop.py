@@ -17,6 +17,10 @@ Settings shape (`loop` in the settings):
            lead is ready; an outcome may send the task back to a work step
   manage   the foreman's loop
   epic     the batch loop before an epic goes to main
+  decisions  who takes a lead's decision points: "person" (the default; the
+           lead stops and asks) or "lead" (the lead takes its recommended
+           option, records it and goes on; loop.md, Stop points). loop.json
+           and the brief carry it
 
 A step's "skills" name what it uses. A default skill (KIT) is the one
 agent-foreman ships in the bundle, unless the settings' `skills` map names a
@@ -103,6 +107,7 @@ KIT = ["work-breakdown", "cross-check", "tdd", "unit", "commit", "smoke", "revie
 PEOPLE = ["lead", "foreman", "person"]
 MODES = ["prompt", "pane"]
 RUNS = ["always", "never", "if-not-trivial"]
+DECIDERS = ["person", "lead"]
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 REPLACED_NOTE = re.compile(r" \(flow and record: [^)]*\)$")
 STOP = "stop"
@@ -143,6 +148,8 @@ def validate_loop(loop):
         limit = role.get("recheck_limit", RECHECK_LIMIT)
         if not isinstance(limit, int) or isinstance(limit, bool) or limit < 1:
             problems.append(f"loop: role {name}: recheck_limit must be a whole number, 1 or more")
+    if loop.get("decisions", "person") not in DECIDERS:
+        problems.append(f"loop: decisions must be one of {', '.join(DECIDERS)}")
     if not loop.get("work"):
         problems.append("loop: the work loop has no steps")
     for which in LOOPS:
@@ -412,7 +419,7 @@ def as_data(cfg, task, difficulty, trivial, resolved, call_name, repo, base, lea
            "disk_min_free_gb": cfg["ops"]["disk_min_free_gb"] if cfg["ops"].get("disk_check", True) else 0,
            "post_answers": cfg.get("post_answers") is True,
            "gate": [dict(c) for c in cfg.get("gate", [])],
-           "max_lines": cfg["difficulty"]["lines"], "roles": {}}
+           "max_lines": cfg["difficulty"]["lines"], "decisions": loop.get("decisions", "person"), "roles": {}}
     overrides = cfg.get("skills", {})
     for which in ("work", "check"):
         steps = plan(loop, difficulty, trivial, which)
@@ -609,6 +616,14 @@ def role_run(task_loop, task_dir, step_id, agent, head, launch):
     return {"agent": agent, "text": text, "prompt": prompt_file, "out": out, "commands": commands, **recheck}
 
 
+DECISION_LINES = {
+    "person": "**Decision points**: the person's. At one, stop and ask, as loop.md's Stop points say.",
+    "lead": ("**Decision points**: yours (`decisions: lead`). At one, take your recommended option, write it in "
+             "plan.md's Decisions and a status line, and go on. Stop only for a merge, an ADR change, a secret, "
+             "data loss, or work outside the task (loop.md, Stop points)."),
+}
+
+
 def render(cfg, task, difficulty, trivial, resolved, profiles, call_name, which="work"):
     """One loop of a task, as Markdown: the work loop for the lead's brief, or
     the check loop for the foreman.
@@ -627,6 +642,8 @@ def render(cfg, task, difficulty, trivial, resolved, profiles, call_name, which=
     lines += [f"**Status**: a `start` and an `end` line for every step you run (`status.py note`, as loop.md says), "
               f"and a `progress` line at least every {ops['report_minutes']} minutes in a long step; "
               f"{ops['stall_minutes']} minutes without a line counts as a stall.", ""]
+    if which == "work":
+        lines += [DECISION_LINES[loop.get("decisions", "person")], ""]
     missing = sorted({v for src, v in resolved.values() if src == "missing"})
     if missing:
         lines += ["**Missing skills** (go on without them, or with the default skill the table shows in a "

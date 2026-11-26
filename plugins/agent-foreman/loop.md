@@ -154,6 +154,11 @@ must-fix and mismatch; a should-fix or could you do not fix goes to the
 follow-up issue. Then go through the steps after it again, up to finalize.
 The gate's verdicts must all be for your new head commit.
 
+The scenario (`scenario.md`, the manual test) runs in full once, up to your
+first ready. In verify of a later round, rerun only the steps whose code the
+change touches, as an addendum that names the head (the `cross-check`
+skill). QA runs the whole scenario at the final head.
+
 ## Follow-up issue
 
 Only a must-fix sends a change back. A review lists its should-fix and could
@@ -182,13 +187,23 @@ Stop only at these, and report:
    caller sees, an interface, a schema or file format, or a core module, and
    that the task does not settle. Write the question with your recommended
    option and its reason, keep working on everything that does not depend on
-   it, and stop when nothing else is left.
+   it, and stop when nothing else is left. When the brief's loop gives the
+   decision points to you ("Decision points: yours", `decisions: lead` in
+   loop.json), most of them are not stops; see below.
 3. **Blocked**: something you cannot get or do, after trying once more.
 4. **Waiting for the foreman**: the next step is the foreman's (`plan-check`,
    at high difficulty). Write the stop line on that step (`--step
    plan-check`). Only the foreman writes that step's `end` line. When the
    foreman tells you to wait for something else, write the stop line on
    your current step, with `--done "waiting: <for what>"`.
+
+**Decision points that are yours.** When the brief's loop gives you the
+decision points, take your recommended option at each one, such as a
+decision point after a recheck. Write the choice and its reason in
+`plan.md`'s Decisions and in a status line (`--event progress --done
+"decision: <choice> — <reason>"`), and go on. Stop only for what needs the
+person: a merge, a change to an architecture decision record (ADR), a
+secret, data loss, or work outside the task.
 
 For a decision, blocked or waiting, write the stop line yourself:
 

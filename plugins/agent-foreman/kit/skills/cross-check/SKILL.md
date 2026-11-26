@@ -31,12 +31,13 @@ One script, run twice. The lead's run shows that the script is right and the pro
 4. Anything you did that the script does not say (a wait, an install, a variable) is a missing step. Add it, and run again from step 1.
 5. A step fails. A script problem: fix the script and run again from step 1. A product problem: see Flow.
 6. Take down what you brought up. Write `## Closing`. Remove the clone from outside it: `clone.py remove --project <repo> --task <task> --agent scenario`.
+7. The script runs in full up to your first ready. In round 2 and later, rerun only the steps whose code your change since the last run touches, and the steps that bring the environment up and take it down. Write them in an addendum after `## Closing` (see Record), and keep the earlier Agent blocks and the Closing as they are.
 
 **User scenario test (step `test`, QA).**
 1. Read the done-when in `$AF_TASK_DIR/task.md` and `$AF_TASK_DIR/scenario.md`. Check that the script covers each done-when; a done-when it does not cover is a `script` mismatch. Do not read the diff, plan.md, or the code.
 2. Start in your own clone at the head commit, in the start directory the preamble names.
 3. Run each step's Do as written. Fill a placeholder only from what an earlier step printed.
-4. Compare your output with the Expect and the Agent block. A value that changes per machine (a port, a path, a time, an id) is not a mismatch.
+4. Compare your output with the Expect and the Agent block. A value that changes per machine (a port, a path, a time, an id) is not a mismatch. Run every step of the script once, also when an addendum reran it; compare it with its latest Agent block, the one in the last addendum that reran it.
 5. A mismatch is a different result, a step you could not do as written, or a value the script did not say where to get. Name its cause: `script` (the script left out something), `environment` (your machine, data or permissions differ), or `product` (the product behaves differently).
 6. Run the steps that take things down, even after a mismatch. Change nothing the script does not tell you to change.
 
@@ -49,7 +50,7 @@ One script, run twice. The lead's run shows that the script is right and the pro
 
 ## Record
 
-**Evidence** for the step's `end` line: in plan, `cross-check: scenario.md <n> steps`; in verify, `cross-check: scenario.md run, Verdict: <pass or fail>`.
+**Evidence** for the step's `end` line: in plan, `cross-check: scenario.md <n> steps`; in verify, `cross-check: scenario.md run, Verdict: <pass or fail>`, or in a later round `cross-check: scenario.md addendum at <head>, steps <n, ...>, Verdict: <pass or fail>`.
 
 The plan and verify steps write `$AF_TASK_DIR/scenario.md` in this shape:
 
@@ -87,4 +88,20 @@ Verdict: <pass or fail>
 - With nothing to bring up, write `Environment: none — <reason>`.
 - A hand act writes one imperative sentence after `**Do** —` in place of the fence, naming the control and the page.
 - The first line under `## Closing` is `Verdict: pass` or `Verdict: fail`, for the last full run. The gate blocks until it is `pass` and every Agent block holds real output.
+- A later round's rerun goes at the end of the file, one addendum per run, in this shape. The gate also blocks until the last addendum's verdict is `pass`:
+
+````markdown
+## Addendum at <head SHA>
+
+Verdict: <pass or fail>
+- Rerun: steps <n, ...>: the change since <the last run's head> touches <what>.
+
+### <n> · <the act, as in the script>
+
+**Agent**
+
+```
+<what this run printed>
+```
+````
 - The test step writes no file. launch.py saves QA's answer under `$AF_TASK_DIR/reviews/`. Each mismatch is one list item, `- mismatch (script|environment|product): step N — <what differed>`, with a fence of the differing output under it, indented two spaces. The answer ends with a blank line and one plain line that is not a list item, `Verdict: pass` (every step ran and matched) or `Verdict: fail`.
