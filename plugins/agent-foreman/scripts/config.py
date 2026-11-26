@@ -39,8 +39,9 @@ Usage:
   config.py plugin-dir-candidates   (this session's --plugin-dir directories, agent-foreman left out, then
       plugins installed on this machine but not enabled here; one directory a line, what each is on stderr)
   config.py skills [--plugin-dir DIR ...]   (skills with these directories added, nothing saved)
-  config.py tier --difficulty low|mid|high --role ROLE [--skip PROFILE,...]
-      (a role other than the lead gets its tier and higher ones, never the lead's profile)
+  config.py tier --difficulty low|mid|high --role ROLE [--lead PROFILE] [--skip PROFILE,...]
+      (a role other than the lead gets its tier and higher ones, never the lead's profile; ROLE is the
+      lead, a role of the settings' loop, or the tester, which runs the red team and QA)
   config.py profiles | projects | machines | skills
 
 `check --models` also asks each provider with a base_url for its model list
@@ -91,7 +92,8 @@ PROVIDER_KEYS = ["id", "name", "base_url", "auth", "token_env", "models"]
 MODEL_ENTRY_KEYS = ["id", "name", "context", "roles", "agent"]
 # Model tiers, lowest first. The red team and QA take one tier above the lead.
 TIERS = loops.LEVELS
-ROLE_STEP = {"redteam": 1, "qa": 1}  # when the settings' loop.roles do not say
+# When the settings' loop.roles do not say. The tester runs the red team and QA, so it takes their tier.
+ROLE_STEP = {"redteam": 1, "qa": 1, "tester": 1}
 LOCAL = "local"
 ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -1109,7 +1111,7 @@ def _cli(argv):
             print("config.py: tier needs --difficulty low|mid|high", file=sys.stderr)
             return 2
         cfg = load(args.project)
-        roles = ["lead"] + list(cfg.get("loop", {}).get("roles", {}))
+        roles = list(dict.fromkeys(["lead", *cfg.get("loop", {}).get("roles", {}), *ROLE_STEP]))
         if args.role not in roles:
             print(f"config.py: --role must be one of {', '.join(roles)}, not {args.role!r}", file=sys.stderr)
             return 2

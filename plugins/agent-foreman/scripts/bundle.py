@@ -48,7 +48,7 @@ SKIP_FILES = {".DS_Store"}
 SSH = ["ssh", "-o", "BatchMode=yes"]
 # The scripts an agent runs, and every module they import (config imports loop).
 BUNDLED = ("config.py", "loop.py", "launch.py", "transcript.py", "score.py", "gate.py", "status.py", "heartbeat.py", "clone.py",
-           "fulltest.py")
+           "fulltest.py", "status_reader.py")
 
 
 def fail(code, message):
