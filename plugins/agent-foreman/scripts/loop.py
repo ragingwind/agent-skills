@@ -419,7 +419,8 @@ def as_data(cfg, task, difficulty, trivial, resolved, call_name, repo, base, lea
            "disk_min_free_gb": cfg["ops"]["disk_min_free_gb"] if cfg["ops"].get("disk_check", True) else 0,
            "post_answers": cfg.get("post_answers") is True,
            "gate": [dict(c) for c in cfg.get("gate", [])],
-           "max_lines": cfg["difficulty"]["lines"], "decisions": loop.get("decisions", "person"), "roles": {}}
+           "max_lines": cfg["difficulty"]["lines"], "size_severity": "block",
+           "decisions": loop.get("decisions", "person"), "roles": {}}
     overrides = cfg.get("skills", {})
     for which in ("work", "check"):
         steps = plan(loop, difficulty, trivial, which)

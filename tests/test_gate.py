@@ -503,11 +503,12 @@ class Template(unittest.TestCase):
         self.assertEqual([c["role"] for c in low["checks"] if c["check"] == "verdict"], ["redteam", "qa"])
         self.assertEqual([c["ids"] for c in low["checks"] if c["check"] == "steps"], [["plan", "build", "verify"]])
         self.assertTrue([c for c in low["checks"] if c["check"] == "docs"][0]["trivial"])
-        self.assertEqual([c for c in low["checks"] if c["check"] == "size"][0]["severity"], "warn")
+        self.assertEqual([c for c in low["checks"] if c["check"] == "size"][0]["severity"], "block")
         self.assertFalse([c for c in low["checks"] if c["check"] in ("command", "loop-file")])
         cmd = gate.template(task_loop(config.merge(self.cfg, {"tests": {"full": "make test"}}), difficulty="low"))
         self.assertEqual([c for c in cmd["checks"] if c["check"] == "command"],
-                         [{"check": "command", "run": "make test", "full": True, "min_free_gb": 20}])
+                         [{"check": "command", "run": "make test", "full": True, "min_free_gb": 20,
+                           "answer": {"role": "qa", "accept": ["pass"], "not_profiles": ["haiku"]}}])
         off = config.merge(self.cfg, {"tests": {"full": "make test"}, "ops": {"disk_check": False}})
         self.assertEqual([c["min_free_gb"] for c in gate.template(task_loop(off))["checks"] if c.get("full")], [0])
 

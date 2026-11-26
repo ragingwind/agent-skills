@@ -37,5 +37,6 @@ You write no file; you have no edit tools. launch.py saves your final answer, wi
 Verdict: fail
 ```
 
+- Write the command in a `ran:` item exactly as the prompt names it. At merge, the gate takes `- ran: <command> — exit 0` in a passing answer at the head as the full test's run, and does not run it again.
 - Under each `ran:` item, a fence with the summary lines as they came. Under each failure, a fence with its full error message and the summary line. Indent the fence two spaces, with a blank line before and after it, so it belongs to its item. Do not retell output in your own words.
 - The last line is `Verdict: pass` or `Verdict: fail`, plain, after a blank line, and not a list item. It is `pass` only when every command that is set ran and passed and the user scenario test passed.
