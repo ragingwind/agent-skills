@@ -317,7 +317,7 @@
       {
         "id": "register",
         "actor": "foreman",
-        "does": "Write the task as task.md (goal, done-when, out of scope) from the person's words, in a new task folder.",
+        "does": "Write the task as task.md (goal, done-when, out of scope) from the person's words, in a new task folder. Size it first: a task over the size budget (difficulty.lines) is split into tasks under it before launch.",
         "skills": [],
         "next": {
           "done": "brief"
@@ -362,7 +362,7 @@
       {
         "id": "verify-session",
         "actor": "foreman",
-        "does": "When the lead is ready, start the verification session: the red team and QA, each in its own clone at the head, on a model other than the lead's (loop.py prompt). Write each step's end line with its outcome (status.py note); it names the step the lead goes back to. After 3 rounds, ask the person.",
+        "does": "When the lead is ready, run the verification session through the task's tester (tester.md): at the first ready, start it on a machine you choose, in its own clone at the pull request's head, on a model other than the lead's; each round, send it the head. It runs the red team, then QA once the red team approves. Stamp its answers into the task folder (stamp.py), post them, and write each step's end line with its outcome (status.py note); it names the step the lead goes back to, with the must-fix list. After 3 rounds, ask the person.",
         "skills": [],
         "next": {
           "done": "merge-gate"
@@ -512,6 +512,7 @@
     "after_merge": [
       "Stop each agent of the task (terminals/herdr.md \"Close\").",
       "Close the task's tab.",
+      "Close the tester on its machine: its tab, its clone (`clone.py remove --project <repo> --task <task> --agent tester --machine <its machine>`) and its tester folder (`status.py dir --project <repo> --task <task> --testing`), removed from outside it.",
       "Archive the task folder to the foreman's project folder: `clone.py archive --project <repo> --task <task> --machine <label>`.",
       "Remove the task's clones and its task folder: `clone.py remove --project <repo> --task <task> --machine <label>`; a refusal names what would be lost, which goes to the person.",
       "Delete the pull request's branch on the remote when the merge left it: `gh api -X DELETE repos/<repo>/git/refs/heads/<branch>`.",
