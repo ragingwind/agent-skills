@@ -361,6 +361,8 @@ value.
 - Every `ops.check_minutes` (the check timer): `status.py read --project
   <repo>`, each machine's `H agent list` and `H tab list --workspace <id>`,
   and `gh` for the pull requests. Then update the ledger and report.
+- When the person asks for the report list, open one Herdr pane on the
+  foreman host and follow `terminals/herdr.md` under "Report pane".
 - **Disk**: a machine `status.py read` marks `low` (under
   `ops.disk_min_free_gb`): ask the agents there to remove build directories,
   stopped containers and unused images; tell the person; place no new task

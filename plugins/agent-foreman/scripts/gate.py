@@ -358,9 +358,8 @@ def check_base_fresh(pr, spec, ctx):
     return behind == 0, f"{behind} commit(s) behind {pr['baseRefName']}"
 
 
-def latest_answers(task_dir, role):
-    """(agent, meta, answer text) of each agent of a role: its latest run in the
-    task folder's reviews/ (launch.py --print --role writes `<out>.meta.json`)."""
+def latest_answers(task_dir, role=None):
+    """(agent, meta, answer text) of each role and agent's latest run in reviews/."""
     by_agent = {}
     for meta_file in glob.glob(os.path.join(task_dir, "reviews", "*.meta.json")):
         try:
@@ -368,13 +367,17 @@ def latest_answers(task_dir, role):
                 meta = json.load(f)
         except (OSError, ValueError):
             continue
-        if not isinstance(meta, dict) or meta.get("role") != role:
+        if not isinstance(meta, dict) or (role is not None and meta.get("role") != role):
+            continue
+        if role is None and (not isinstance(meta.get("role"), str) or not meta["role"]
+                             or not isinstance(meta.get("ok"), bool)):
             continue
         agent = meta.get("agent") or meta_file
-        if agent not in by_agent or str(meta.get("ended", "")) > str(by_agent[agent][0].get("ended", "")):
-            by_agent[agent] = (meta, meta_file[:-len(".meta.json")] + ".json")
+        key = (str(meta.get("role", "")), str(agent))
+        if key not in by_agent or str(meta.get("ended", "")) > str(by_agent[key][0].get("ended", "")):
+            by_agent[key] = (meta, meta_file[:-len(".meta.json")] + ".json")
     out = []
-    for agent, (meta, answer_file) in sorted(by_agent.items()):
+    for (_, agent), (meta, answer_file) in sorted(by_agent.items()):
         text = ""
         try:
             with open(answer_file, encoding="utf-8") as f:

@@ -182,6 +182,8 @@ class Codex(unittest.TestCase):
     def test_last_answers_by_codex_id_or_the_foremans(self):
         root = os.path.join(self.home.root, "codex", "sessions")
         path = self.session_file(root, "019a-real-0001", ["a1", None, "a2"])
+        with open(path, "a") as f:
+            f.write("[]\nnull\n")
         self.assertEqual(codex.last_answers("019a-real-0001", 1, root=root), (["a2"], 2))
         self.assertEqual(codex.last_answers("019a-real-0001", 5, root=root), (["a1", "a2"], 2))
         with self.assertRaises(adapters.NoTranscript):

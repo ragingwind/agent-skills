@@ -143,6 +143,24 @@ Run it with `run_in_background`. Without `--until` it returns on `idle`,
 while the agent works. States: `idle`, `working`, `blocked` (a question or
 permission dialog is open), `done`, `unknown`.
 
+## Report pane
+
+To see one project's Lead replies and headless review results together, run
+the board in a Herdr pane on the foreman host.
+
+```bash
+python3 <skill>/scripts/board.py watch --project owner/repo
+```
+
+For each configured remote machine, pass `--remote-bundle label=/absolute/path`
+using the path from `bundle.py push <label> --project owner/repo`. Push a fresh
+bundle when enabling the report pane for existing machines. The list refreshes
+when a tracked Lead settles and polls for headless results. It marks a machine
+stale when its records cannot be read. Add `--once` for a single snapshot.
+
+Send instructions to a Lead through the Foreman chat. The Lead's latest
+settled reply appears in the report pane alongside its current task status.
+
 ## Keys
 
 ```bash

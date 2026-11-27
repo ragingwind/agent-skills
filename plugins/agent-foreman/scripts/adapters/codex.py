@@ -257,7 +257,9 @@ def last_answers(session_id, n=1, root=None):
                 entry = json.loads(line)
             except ValueError:
                 continue
-            payload = entry.get("payload") if isinstance(entry, dict) else None
+            if not isinstance(entry, dict):
+                continue
+            payload = entry.get("payload")
             if (entry.get("type") == "event_msg" and isinstance(payload, dict)
                     and payload.get("type") == "task_complete"
                     and isinstance(payload.get("last_agent_message"), str)
