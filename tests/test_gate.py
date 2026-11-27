@@ -1,8 +1,10 @@
+import glob
 import json
 import os
 import shutil
 import stat
 import subprocess
+import tempfile
 import unittest
 
 from helpers import TempHome, run, task_loop
@@ -129,6 +131,31 @@ class CommandChecks(unittest.TestCase):
         self.assertTrue(gate.evaluate(pr(), g, cwd=os.getcwd(), task_dir="/t")["pass"])
         self.assertFalse(gate.evaluate(pr(baseRefName="dev"), g, cwd=os.getcwd(), task_dir="/t")["pass"])
         self.assertEqual(gate.evaluate(pr(), g)["checks"][0]["evidence"], "needs --cwd")
+
+    def test_a_command_s_whole_output_goes_to_a_log_in_the_task_folder(self):
+        home = TempHome()
+        self.addCleanup(home.close)
+        task = os.path.join(home.root, "task")
+        os.makedirs(task)
+        script = "for i in 1 2 3 4 5; do echo out-$i; echo err-$i >&2; done; exit 3"
+        g = {"repo": "o/r", "pr": 7, "checks": [{"check": "command", "name": "unit tests/x", "run": script}]}
+        evidence = gate.evaluate(pr(), g, cwd=home.root, task_dir=task)["checks"][0]["evidence"]
+        logs = glob.glob(os.path.join(task, "gate-logs", f"unit-tests-x-{HEAD[:8]}-*.log"))
+        self.assertEqual(len(logs), 1, f"one log under gate-logs/ for {script!r}: {evidence}")
+        with open(logs[0], encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        self.assertEqual(lines, [f"{s}-{i}" for i in range(1, 6) for s in ("out", "err")],
+                         f"stdout and stderr of {script!r} in the order written")
+        self.assertEqual(evidence, f"exit 3: err-4 | out-5 | err-5 (log: {logs[0]})")
+
+    def test_a_command_s_log_goes_to_the_temporary_directory_without_a_task_folder(self):
+        g = {"repo": "o/r", "pr": 7, "checks": [{"check": "command", "name": "env", "run": "echo hello"}]}
+        for task_dir in (None, "/no/such/task/folder"):
+            evidence = gate.evaluate(pr(), g, cwd=os.getcwd(), task_dir=task_dir)["checks"][0]["evidence"]
+            log = evidence.rsplit("(log: ", 1)[1].rstrip(")")
+            self.addCleanup(os.unlink, log)
+            self.assertEqual(os.path.dirname(log), tempfile.gettempdir(), f"task_dir={task_dir!r}: {evidence}")
+            self.assertTrue(evidence.startswith("exit 0: hello (log: "), f"task_dir={task_dir!r}: {evidence}")
 
     def test_the_full_tests_run_one_at_a_time_and_not_under_the_disk_floor(self):
         home = TempHome()
