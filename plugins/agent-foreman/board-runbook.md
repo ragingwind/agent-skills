@@ -32,9 +32,9 @@ Run these commands from the repository root. The fixture uses temporary task dir
 
 | # | Run | Expect | Agent | Person |
 |---|---|---|---|---|
-| 1 | `python3 -B -m unittest discover -s tests -p test_board.py -k test_cli` | A fake SSH command runs the script packaged in a real bundle under a distinct home. One view includes task `7` on `local` as Lead and on `build` as QA. A missing bundle is shown alongside the local row. A fresh local view shows `No reports`, and invalid project input exits 2. | `Ran 2 tests in 0.732s` · `OK` | |
-| 2 | `python3 -B -m unittest discover -s tests -p test_board.py -k test_watch` | A controlled event refreshes its machine before the next timed check. Pane waits require `working` before reporting a settle. A plain reply replaces an earlier reply while the decision remains visible. The timed check picks up a headless result. A disconnect marks the machine stale and recovery removes the stale marker and obsolete rows. | `Ran 2 tests in 0.004s` · `OK` | |
-| 3 | `python3 -B -m unittest discover -s tests -p test_board.py -k test_records` | A later QA status note leaves the earlier Lead decision visible. Invalid records are skipped, and control bytes in records never enter the text list. | `Ran 1 test in 0.011s` · `OK` | |
+| 1 | `python3 -B -m unittest discover -s tests -p test_board.py -k test_cli` | A fake SSH command runs the script packaged in a real bundle under a distinct home. One view includes task `7` on `local` as Lead and on `build` as QA. A missing bundle is shown alongside the local row. A fresh local view shows `No reports`, and invalid project input exits 2. | `Ran 2 tests in 1.376s` · `OK` | |
+| 2 | `python3 -B -m unittest discover -s tests -p test_board.py -k test_watch` | A controlled event refreshes its machine before the next timed check. Pane waits require `working` before reporting a settle. A settle that lands after one settled wait times out and before the next wait starts is still reported, once. A plain reply replaces an earlier reply while the decision remains visible. The timed check picks up a headless result. A disconnect marks the machine stale and recovery removes the stale marker and obsolete rows. | `Ran 3 tests in 0.004s` · `OK` | |
+| 3 | `python3 -B -m unittest discover -s tests -p test_board.py -k test_records` | A later QA status note leaves the earlier Lead decision visible. Invalid records are skipped, and control bytes in records never enter the text list. | `Ran 1 test in 0.006s` · `OK` | |
 
 ## Evidence
 
@@ -53,6 +53,8 @@ Independent verification reproduced non-object transcript entries stopping a
 refresh and invalid review metadata hiding a valid earlier run. The readers
 now skip these entries. The board scenario and Codex adapter test cover them.
 The independent post-fix full run reported `Ran 324 tests in 92.263s` and `OK`.
+After the live check's fix (below), the full run on Python 3.12.8 reported
+`Ran 325 tests in 98.829s` and `OK`, and both validations below passed again.
 
 The sandboxed baseline could not bind the provider test's loopback port. The
 full run above allowed loopback. Existing tests emitted `ResourceWarning` for
@@ -71,3 +73,30 @@ unclosed files in `test_gate.py` and `test_launch.py`.
   ❯ .claude-plugin/plugin.json icon: No icon (ICON_MISSING).
 ✔ Validation passed
 ```
+
+## Live check
+
+Run on 2026-11-27 (times UTC) in a sandbox from `fixture/sandbox.py create`,
+`ragingwind/agent-foreman-sandbox-20261127-045428`, whose machines are `local`
+and the remote `isla-hkmoon-003`. The Lead was an interactive `sonnet` session
+in a Herdr pane on `local`, with its row in the ledger. QA ran headless on the
+remote with the `launch.py opus --print --role qa` command that `loop.py prompt`
+printed. The board ran in its own Herdr pane with `--interval 120`, so a refresh
+from an event and a timed refresh happen at different times. A script read the
+board pane every half second and logged each change with its time.
+
+| Check | What happened | Result |
+|---|---|---|
+| Lead decision | The Lead wrote `REPORT: decision — what a user sees when --min filters out every item; recommend print nothing and exit 0 ...` as its stop line and settled at 04:58:27. At 04:58:43 the board still showed `#1  local  lead  pending`. The next timed refresh was due at 05:00:03. | Failed, fixed below |
+| Reply to a Foreman instruction, after the fix (board restarted at 05:03:12) | The question went to the Lead with `herdr agent prompt`, the command the foreman sends. The Lead settled at 05:03:38. At 05:03:39 the board showed its plain reply after the decision. The next timed refresh was due at 05:05:13. | Passed |
+| A Lead turn longer than one settled wait | An 18-second turn settled at 05:05:00 and its reply appeared at 05:05:01. | Passed |
+| Headless QA | The first QA run ended without a `Verdict:` line because the build had not run, and the 05:07:13 refresh showed it as `completed`. The second run, with the remote task marked trivial, ended with `Verdict: pass` at 05:08:17. The 05:09:14 refresh showed `#1  isla-hkmoon-003  qa  pass  qa-1 \| The full test suite passed at head commit 5126a64 ... \| at 5126a64ea2ff` under the Lead's row, and the first run's row was gone. | Passed |
+| Disconnect and reconnect | From 05:09:33 to 05:11:36, an `ssh` wrapper on the board's `PATH` exited 255, as `ssh` does when the connection drops. Herdr's own connection to the machine stayed up, because other agents ran there. The 05:11:13 refresh kept both rows and added `isla-hkmoon-003: stale (SSH or remote bundle read failed)`. The 05:13:14 refresh removed the marker and showed each row once. | Passed |
+
+The fix: after a settled wait timed out, `wait_for_settle` waited for
+`working` again. When the agent settled in the second between two waits, no
+later wait saw it working, so the settle was never reported and the list
+waited for the timed refresh. A replay of the same Herdr calls caught a settle
+that did not fall in that gap. A settled wait now stays armed until it returns.
+`test_watch_reports_a_settle_between_two_waits` failed before the fix and
+passes after it.

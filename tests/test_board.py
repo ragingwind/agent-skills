@@ -132,6 +132,29 @@ class Board(TestCase):
                                  "--until", "working"])
         self.assertEqual(second, first[:-2])
 
+    def test_watch_reports_a_settle_between_two_waits(self):
+        # The agent works past one settled wait's timeout and settles before the next wait starts.
+        states = ["working", "working", "done", "done"]
+        waits = []
+
+        def herdr(argv, **kwargs):
+            if not states:
+                stop.set()
+                return subprocess.CompletedProcess(argv, 1)
+            state = states.pop(0)
+            until_working = argv[-2:] == ["--until", "working"]
+            waits.append("working" if until_working else "settled")
+            return subprocess.CompletedProcess(argv, 0 if until_working == (state == "working") else 1)
+
+        events = board.Queue()
+        stop = board.Event()
+        with (mock.patch.object(board.subprocess, "run", side_effect=herdr),
+              mock.patch.object(stop, "wait", return_value=False)):
+            board.wait_for_settle("build", "w1:p1", events, stop)
+        self.assertEqual(waits, ["working", "settled", "settled", "working"])
+        self.assertEqual(events.get_nowait(), ("build", "w1:p1"))
+        self.assertTrue(events.empty())
+
     def test_watch_event_poll_and_recovery(self):
         cfg = {"machines": {"local": "/local", "build": "/remote"}, "profiles": {}, "ops": {"stall_minutes": 30}}
         leads = {"local": {"7": {"pane": "w1:p1"}}, "build": {"7": {"pane": "w1:p2"}}}

@@ -186,22 +186,26 @@ def render(repo, views, errors):
 
 
 def wait_for_settle(machine, pane, events, stop):
-    """Arm a settled wait after Herdr observes work in the pane."""
+    """Report each settle of the pane's agent after Herdr observes it working.
+
+    A settled wait that times out stays armed: the agent may settle before the next wait starts.
+    """
+    working = False
     while not stop.is_set():
+        until = [] if working else ["--until", "working"]
         try:
-            for until in (["--until", "working"], []):
-                if stop.is_set():
-                    return
-                run = subprocess.run(herdr_command(machine, "agent", "wait", pane, "--timeout", "5000", *until),
-                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=7)
-                if run.returncode:
-                    break
-            else:
-                events.put((machine, pane))
-                continue
+            run = subprocess.run(herdr_command(machine, "agent", "wait", pane, "--timeout", "5000", *until),
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=7)
         except (OSError, subprocess.SubprocessError):
-            pass
-        stop.wait(1)
+            stop.wait(1)
+            continue
+        if run.returncode:
+            stop.wait(1)
+        elif working:
+            events.put((machine, pane))
+            working = False
+        else:
+            working = True
 
 
 def refresh(repo, machines, leads, stall, saved, bundles, views, errors):
