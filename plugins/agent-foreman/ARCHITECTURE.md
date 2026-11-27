@@ -606,6 +606,7 @@ Pass conditions are code, not prose (`scripts/gate.py`).
   | `status.jsonl` | lead, foreman, hooks | Section 9 |
   | `reviews/` | `launch.py`, `stamp.py`, foreman | Each role run's prompt, answer and meta; the red team's and QA's answers stamped from the tester's; the foreman's `findings-r<round>.md` |
   | `gates.jsonl` | `gate.py run` | Each gate run: the head, whether it passed, what blocked and what warned |
+  | `gate-logs/` | `gate.py run` | Each command check's whole output, one file per run; its evidence names the file |
 
 - **Tester folder**, on the tester's machine:
   `~/.local/state/agent-foreman/testing/<owner>-<repo>/<task>/` (`status.py

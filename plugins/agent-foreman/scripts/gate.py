@@ -79,6 +79,12 @@ Checks (each may say "severity": "warn" to report without blocking):
   command         "run" exits 0 in the clone (--cwd); it gets AF_REPO, AF_PR,
                   AF_TASK, AF_TASK_DIR, AF_BASE, AF_BASE_SHA (the base
                   branch's head on GitHub) and AF_HEAD in its environment.
+                  Its whole output, stdout and stderr in the order written,
+                  goes to a log file: with --task-dir in the task folder's
+                  gate-logs/, else in the temporary directory. The evidence
+                  holds the last three lines and the log's path, so a
+                  failure can be read in full and only the failing tests
+                  run again.
                   With "from_base": PATH instead of "run", the gate takes the
                   script at PATH from AF_BASE_SHA itself (fetched from origin
                   when the clone lacks it) and runs that: the lead's own
@@ -119,6 +125,8 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
+import time
 
 EXIT_GATE_FAILED = 6
 TEST_PATHS = ["**/tests/**", "**/test/**", "**/__tests__/**", "**/*_test.*", "**/test_*.*", "**/*.test.*",
@@ -489,7 +497,6 @@ def generated_at_base(cwd, sha, paths):
     objects = subprocess.run(["git", "-C", cwd, "rev-parse", "--git-path", "objects"], capture_output=True, text=True)
     if objects.returncode != 0:
         return None
-    import tempfile
     with tempfile.TemporaryDirectory() as tmp:
         env = {**os.environ, "GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull,
                "GIT_INDEX_FILE": os.path.join(tmp, "index")}
@@ -739,26 +746,51 @@ def check_command(pr, spec, ctx):
            "AF_TASK": str(ctx.get("task") or ""), "AF_TASK_DIR": ctx.get("task_dir") or "",
            "AF_BASE": pr.get("baseRefName") or "", "AF_BASE_SHA": pr.get("baseRefOid") or "",
            "AF_HEAD": pr.get("headRefOid") or ""}
+    script_file = None
     if spec.get("from_base"):
         script, why = base_script(ctx["cwd"], pr.get("baseRefOid"), spec["from_base"])
         if script is None:
             return False, why
-        import tempfile
         with tempfile.NamedTemporaryFile("w", suffix=".script", delete=False) as f:
             f.write(script)
         os.chmod(f.name, 0o700)
-        argv = [f.name] if script.startswith("#!") else ["sh", f.name]
-        try:
-            out = subprocess.run(argv, cwd=ctx["cwd"], capture_output=True, text=True, env=env)
-        finally:
-            os.unlink(f.name)
+        script_file = f.name
+        argv, shell = ([f.name] if script.startswith("#!") else ["sh", f.name]), False
     elif spec.get("full"):
-        argv = [sys.executable, FULLTEST, "--min-free-gb", str(spec.get("min_free_gb", 0)), "--", spec["run"]]
-        out = subprocess.run(argv, cwd=ctx["cwd"], capture_output=True, text=True, env=env)
+        argv, shell = [sys.executable, FULLTEST, "--min-free-gb", str(spec.get("min_free_gb", 0)), "--",
+                       spec["run"]], False
     else:
-        out = subprocess.run(spec["run"], shell=True, cwd=ctx["cwd"], capture_output=True, text=True, env=env)
-    tail = (out.stdout + out.stderr).strip().splitlines()[-3:]
-    return out.returncode == 0, f"exit {out.returncode}: {' | '.join(tail)}"
+        argv, shell = spec["run"], True
+    log_path = command_log_path(pr, spec, ctx)
+    try:
+        # One file for both streams keeps the order a failure was written in.
+        with open(log_path, "w", encoding="utf-8") as log:
+            code = subprocess.run(argv, shell=shell, cwd=ctx["cwd"], stdout=log, stderr=subprocess.STDOUT,
+                                  env=env).returncode
+    finally:
+        if script_file:
+            os.unlink(script_file)
+    with open(log_path, encoding="utf-8", errors="replace") as log:
+        tail = log.read().strip().splitlines()[-3:]
+    return code == 0, f"exit {code}: {' | '.join(tail)} (log: {log_path})"
+
+
+def command_log_path(pr, spec, ctx):
+    """Where a command check's whole output goes: the task folder's
+    gate-logs/ (made when missing) when the folder exists, else the
+    temporary directory; one new
+    file per run, named after the check, the head and the time."""
+    name = re.sub(r"[^A-Za-z0-9._-]+", "-", check_name(spec))
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    head = (pr.get("headRefOid") or "nohead")[:8]
+    if ctx.get("task_dir") and os.path.isdir(ctx["task_dir"]):
+        folder = os.path.join(ctx["task_dir"], "gate-logs")
+        os.makedirs(folder, exist_ok=True)
+    else:
+        folder = tempfile.gettempdir()
+    fd, path = tempfile.mkstemp(prefix=f"{name}-{head}-{stamp}-", suffix=".log", dir=folder)
+    os.close(fd)
+    return path
 
 
 CHECKS = {"pr-open": check_pr_open, "loop-file": check_loop_file, "steps": check_steps, "docs": check_docs,

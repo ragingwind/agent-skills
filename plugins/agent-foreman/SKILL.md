@@ -137,7 +137,8 @@ foreman session. This session keeps the old path.
   is a run of steps; `loop.py show [--loop check]` lists them.
 - **Task folder**: `status.py dir --project <repo> --task <task>` on the
   task's machine: `task.md`, `brief.md`, `loop.json`, `gate.json`, `plan.md`,
-  `scenario.md`, `handoff.md`, `reviews/`, `status.jsonl`, `gates.jsonl`. The
+  `scenario.md`, `handoff.md`, `reviews/`, `status.jsonl`, `gates.jsonl`,
+  `gate-logs/`. The
   foreman makes it, reads it and archives it.
 - **Default skill**: what each step's action is (`kit/skills/<name>`). The
   settings' `skills` map may replace one with a project or local skill. The
@@ -572,8 +573,9 @@ the gate may wait for another task's run. When `command` blocks with
 machine, as for a `low` machine in "Watch", and run the gate again. Do not
 send it to the lead.
 
-When the full tests (`command`) fail, first run only the failing tests
-again, alone, at the head in the lead's clone. When they fail again, send
+When the full tests (`command`) fail, find the failing tests in the log
+the evidence names (`gate-logs/` in the task folder, the whole output), and
+run only those again, alone, at the head in the lead's clone. When they fail again, send
 them to the lead. When they pass alone, the test is flaky: tell the person
 the test and both results. When the person says to merge anyway, run the
 merge gate with `--skip command` and log the person's words. Do not run the
