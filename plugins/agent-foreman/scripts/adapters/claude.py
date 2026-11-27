@@ -138,9 +138,10 @@ def _projects(root):
 
 
 def _starts_turn(entry):
-    if entry.get("isMeta"):
+    message = entry.get("message")
+    if entry.get("isMeta") or not isinstance(message, dict):
         return False
-    content = entry.get("message", {}).get("content")
+    content = message.get("content")
     if isinstance(content, str):
         return True
     if isinstance(content, list):
@@ -162,16 +163,22 @@ def turns(lines):
             entry = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if entry.get("isSidechain"):
+        if not isinstance(entry, dict) or entry.get("isSidechain"):
             continue
         if entry.get("type") == "user" and _starts_turn(entry):
             out.append([])
         elif entry.get("type") == "assistant":
-            for block in entry.get("message", {}).get("content", []) or []:
-                if isinstance(block, dict) and block.get("type") == "text" and block.get("text", "").strip():
-                    if not out:
-                        out.append([])
-                    out[-1].append(block["text"])
+            message = entry.get("message")
+            content = message.get("content") if isinstance(message, dict) else None
+            if not isinstance(content, list):
+                continue
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text = block.get("text")
+                    if isinstance(text, str) and text.strip():
+                        if not out:
+                            out.append([])
+                        out[-1].append(text)
     return out
 
 
