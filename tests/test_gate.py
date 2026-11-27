@@ -581,6 +581,43 @@ class SameChange(unittest.TestCase):
             home.close()
 
 
+    def test_a_stack_layer_keeps_its_verdict_when_the_layer_below_was_rebased(self):
+        home = TempHome()
+        try:
+            work, sh = git_repo(home)
+
+            def commit(name, text):
+                with open(os.path.join(work, name), "w") as f:
+                    f.write(text)
+                sh("add", "-A"); sh("commit", "-q", "-m", name)
+            sh("checkout", "-q", "-b", "lower"); commit("l.txt", "l\n")
+            old_lower = sh("rev-parse", "HEAD")
+            sh("checkout", "-q", "-b", "upper"); commit("u.txt", "u\n")
+            reviewed = sh("rev-parse", "HEAD")
+            sh("checkout", "-q", "main"); commit("m.txt", "m\n"); sh("push", "-q", "origin", "HEAD:main")
+            sh("checkout", "-q", "lower"); sh("rebase", "-q", "main"); sh("push", "-q", "origin", "HEAD:lower")
+            sh("checkout", "-q", "upper"); sh("rebase", "-q", "--onto", "lower", old_lower)
+            head = sh("rev-parse", "HEAD")
+            sh("fetch", "-q")
+            self.assertTrue(gate.same_change(work, "lower", reviewed, head),
+                            f"upper {reviewed[:7]} -> {head[:7]} after lower was rebased onto main")
+            commit("u.txt", "u changed\n")
+            self.assertFalse(gate.same_change(work, "lower", reviewed, sh("rev-parse", "HEAD")),
+                             "a layer with a new commit on top is not the same change")
+            sh("reset", "-q", "--hard", head); sh("checkout", "-q", "lower")
+            rebased_lower = sh("rev-parse", "HEAD")
+            with open(os.path.join(work, "l.txt"), "w") as f:
+                f.write("l changed\n")
+            sh("add", "-A"); sh("commit", "-q", "--amend", "-m", "l.txt")
+            sh("push", "-q", "-f", "origin", "HEAD:lower"); sh("checkout", "-q", "upper")
+            sh("rebase", "-q", "--onto", "lower", rebased_lower); sh("fetch", "-q")
+            # Kept on the safe side: the old layer's own commits now hold the lower one's old commit.
+            self.assertFalse(gate.same_change(work, "lower", reviewed, sh("rev-parse", "HEAD")),
+                             "a lower layer whose commit was amended leaves the old commit's own commits different")
+        finally:
+            home.close()
+
+
 FAKE_GH = """#!/usr/bin/env python3
 import json, os, sys
 data = json.load(open(os.environ["FAKE_GH_DATA"]))

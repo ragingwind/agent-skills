@@ -233,24 +233,41 @@ def same_sha(a, b):
 
 
 def same_change(cwd, base, a, b):
-    """Whether two commits carry the same change against the base (`git
-    patch-id` of each squashed diff), as after a clean rebase."""
+    """Whether two commits carry the same change against the base, as after
+    a clean rebase: the `git patch-id` of each one's squashed diff from its
+    merge base with the base branch, or else the patch-ids of each one's own
+    commits, left after dropping those the base branch holds an equal of.
+    The second form covers a stack layer whose lower layer was rebased too:
+    the old commit's merge base is then below the lower layer's old commits,
+    so its squashed diff holds them."""
     def run(*args, stdin=None):
         return subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, input=stdin)
 
-    ids = []
+    def patch_id(diff):
+        pid = run("patch-id", "--stable", stdin=diff.stdout)
+        if diff.returncode != 0 or pid.returncode != 0 or not pid.stdout.strip():
+            return None
+        return pid.stdout.split()[0]
+
+    def squashed(sha):
+        mb = run("merge-base", f"origin/{base}", sha)
+        return patch_id(run("diff", mb.stdout.strip(), sha)) if mb.returncode == 0 else None
+
+    def own_commits(sha):
+        revs = run("rev-list", "--cherry-pick", "--right-only", "--no-merges", "--reverse", f"origin/{base}...{sha}")
+        if revs.returncode != 0:
+            return None
+        ids = [patch_id(run("show", "--pretty=format:", "--patch", rev)) for rev in revs.stdout.split()]
+        return ids if ids and None not in ids else None
+
     for sha in (a, b):
         if run("cat-file", "-e", f"{sha}^{{commit}}").returncode != 0:
             run("fetch", "--quiet", "origin", sha)
-        mb = run("merge-base", f"origin/{base}", sha)
-        if mb.returncode != 0:
-            return False
-        diff = run("diff", mb.stdout.strip(), sha)
-        pid = run("patch-id", "--stable", stdin=diff.stdout)
-        if diff.returncode != 0 or pid.returncode != 0 or not pid.stdout.strip():
-            return False
-        ids.append(pid.stdout.split()[0])
-    return ids[0] == ids[1]
+    first = squashed(a)
+    if first is not None and first == squashed(b):
+        return True
+    mine = own_commits(a)
+    return mine is not None and mine == own_commits(b)
 
 
 def section(body, name):
